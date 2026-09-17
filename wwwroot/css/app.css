@@ -1,0 +1,83 @@
+:root { color-scheme: dark; font-family: "Cascadia Mono", Consolas, monospace; background: #0a0d0c; color: #e9e1cf; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 16% 5%, #183d32 0, #0d1815 28%, #080b0a 66%); }
+button { font: inherit; }
+button:focus-visible, summary:focus-visible { outline: 2px solid #f5d36b; outline-offset: 3px; }
+.game-shell { width: min(1440px, 100%); margin: 0 auto; padding: 30px clamp(18px, 4vw, 64px) 64px; }
+.game-header { display: flex; align-items: end; justify-content: space-between; gap: 30px; padding-bottom: 24px; border-bottom: 1px solid #8c7b554f; }
+.eyebrow, .section-label { margin: 0 0 5px; color: #c3ad79; font-size: 10px; letter-spacing: .22em; text-transform: uppercase; }
+h1 { margin: 0; font: 400 clamp(42px, 6vw, 78px)/.96 Georgia, serif; letter-spacing: -.045em; }
+h1 span { color: #d4a72c; font-style: italic; }
+.status-strip { display: flex; align-items: stretch; border: 1px solid #8c7b554f; background: #0b100ee6; }
+.status-strip > div { min-width: 118px; padding: 12px 18px; border-left: 1px solid #8c7b554f; }
+.status-strip > div:first-child { border-left: 0; }
+.status-strip small { display: block; color: #7f918b; font-size: 9px; letter-spacing: .13em; }
+.status-strip strong { display: block; margin-top: 3px; color: #f3ead8; font-size: 18px; }
+.status-strip .point-box { min-width: 82px; text-align: center; }
+.point-box.on { background: #713429; }
+.point-box.off strong { color: #7d8985; }
+.game-grid { display: grid; grid-template-columns: minmax(380px, .9fr) minmax(520px, 1.1fr); gap: clamp(28px, 5vw, 78px); align-items: center; padding: 36px 0 24px; }
+.wheel-panel { display: flex; flex-direction: column; align-items: center; }
+#dice-wheel { display: block; max-width: 620px; }
+.result-banner { min-height: 47px; width: min(540px, 95%); margin-top: -6px; padding: 12px 18px; text-align: center; color: #c8d2ce; border-top: 1px solid #6e7a7547; font-size: 12px; line-height: 1.5; }
+.spin-button { width: min(380px, 85%); padding: 15px 28px 13px; color: #121514; background: #e0bd58; border: 0; box-shadow: 0 8px 30px #0008; cursor: pointer; transition: transform .16s, background .16s; }
+.spin-button:hover:not(:disabled) { transform: translateY(-2px); background: #f5d36b; }
+.spin-button:disabled { cursor: wait; opacity: .72; }
+.spin-button span, .spin-button small { display: block; }
+.spin-button span { font-weight: 700; letter-spacing: .1em; }
+.spin-button small { margin-top: 3px; font-size: 9px; opacity: .65; }
+.betting-panel { padding: clamp(20px, 3vw, 38px); border: 1px solid #8c7b554f; background: linear-gradient(145deg, #10271fef, #0b1512f5); box-shadow: 0 24px 70px #0007; }
+.panel-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 20px; }
+h2 { margin: 0; font: 400 40px/1 Georgia, serif; }
+.text-button { padding: 7px 0; color: #b7c2be; background: transparent; border: 0; border-bottom: 1px solid #63736d; cursor: pointer; font-size: 10px; text-transform: uppercase; }
+.text-button:disabled { opacity: .3; cursor: default; }
+.number-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; }
+.bet-spot { position: relative; min-height: 82px; padding: 9px 4px; overflow: hidden; color: #e9e1cf; background: #132e25; border: 1px solid #59716870; cursor: pointer; transition: border .15s, background .15s, transform .15s; }
+.bet-spot:hover:not(:disabled) { z-index: 1; transform: translateY(-2px); border-color: #cfb36c; background: #183a2e; }
+.bet-spot:disabled { cursor: wait; }
+.bet-spot .number { display: block; font: 400 30px/1 Georgia, serif; }
+.bet-spot .odds { display: block; margin-top: 7px; color: #8ea097; font-size: 7px; letter-spacing: .05em; }
+.bet-spot .placed { position: absolute; right: 5px; top: 5px; min-width: 28px; padding: 5px 3px; color: #15130c; background: #e7cb77; border: 2px dashed #55430f; border-radius: 50%; font-size: 8px; text-align: center; box-shadow: 0 2px 4px #0007; }
+.bet-spot.has-bet { border-color: #d9ba60; background: #1c4336; }
+.bet-spot.dont { grid-column: 5 / 7; background: #562a24; }
+.bet-spot.dont:hover:not(:disabled), .bet-spot.dont.has-bet { background: #713429; }
+.section-label { display: block; margin-top: 21px; }
+.hardway-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.bet-spot.hard { min-height: 68px; background: #24251e; }
+.bet-spot.hard .number { color: #dfbd5a; font-size: 25px; }
+.chip-rack { display: flex; align-items: center; gap: 12px; margin-top: 24px; padding-top: 19px; border-top: 1px solid #71807848; }
+.chip-rack .section-label { margin: 0 auto 0 0; }
+.chip { width: 51px; height: 51px; padding: 0; color: white; border: 3px dashed #ffffffa8; border-radius: 50%; box-shadow: 0 3px 8px #0009, inset 0 0 0 4px #0003; cursor: pointer; font-size: 10px; transition: transform .15s; }
+.chip:hover, .chip.selected { transform: translateY(-5px); }
+.chip.selected { outline: 2px solid #e8cf86; outline-offset: 4px; }
+.chip-5 { background: #b14232; }.chip-10 { background: #2d7393; }.chip-25 { background: #27744e; }.chip-100 { background: #24262a; }
+.rules { margin-top: 22px; color: #96a69f; font-size: 10px; line-height: 1.65; }
+.rules summary { color: #c8b886; cursor: pointer; }
+.rules p { margin: 10px 0 0; }
+.history { display: grid; grid-template-columns: 80px 1fr; gap: 6px 18px; max-width: 880px; padding-top: 18px; border-top: 1px solid #8c7b554f; color: #87958f; font-size: 9px; line-height: 1.5; }
+.history span { grid-row: 1 / 8; color: #c2aa70; letter-spacing: .15em; }
+.history p { margin: 0; }
+#blazor-error-ui { display: none; position: fixed; inset: auto 0 0; padding: 12px; color: #111; background: #e9c75e; text-align: center; }
+.loading-progress { display: block; margin: 30vh auto 20px; width: 70px; }
+.loading-progress-text { text-align: center; }
+
+@media (max-width: 960px) {
+    .game-header { align-items: start; }
+    .game-grid { grid-template-columns: 1fr; }
+    .wheel-panel { order: 1; }
+    .betting-panel { order: 2; }
+}
+@media (max-width: 650px) {
+    .game-shell { padding: 20px 12px 40px; }
+    .game-header { display: block; }
+    .status-strip { margin-top: 22px; }
+    .status-strip > div { flex: 1; min-width: 0; padding: 9px; }
+    .game-grid { padding-top: 20px; gap: 20px; }
+    .betting-panel { padding: 16px 10px; }
+    .number-grid { grid-template-columns: repeat(3, 1fr); }
+    .bet-spot.dont { grid-column: 2 / 4; }
+    .hardway-grid { grid-template-columns: repeat(2, 1fr); }
+    .chip-rack { gap: 7px; }
+    .chip-rack .section-label { display: none; }
+    .chip { width: 47px; height: 47px; }
+}

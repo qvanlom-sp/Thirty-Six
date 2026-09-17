@@ -1,0 +1,137 @@
+@page "/"
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@using Casino_Game.Models
+@using Casino_Game.Systems
+
+<PageTitle>Thirty-Six — Dice Wheel</PageTitle>
+
+<div class="game-shell">
+    <header class="game-header">
+        <div>
+            <p class="eyebrow">THE DICE WHEEL</p>
+            <h1>THIRTY<span>—SIX</span></h1>
+        </div>
+        <div class="status-strip">
+            <div><small>BANKROLL</small><strong>@Money(Engine.State.Player.Bankroll)</strong></div>
+            <div><small>ON TABLE</small><strong>@Money(Engine.State.TotalOnTable)</strong></div>
+            <div class="point-box @(Engine.State.Point is null ? "off" : "on")">
+                <small>POINT</small><strong>@(Engine.State.Point?.ToString() ?? "OFF")</strong>
+            </div>
+        </div>
+    </header>
+
+    <main class="game-grid">
+        <section class="wheel-panel">
+            <canvas id="dice-wheel" aria-label="A roulette wheel with 36 equally likely dice combinations"></canvas>
+            <div class="result-banner" aria-live="polite">@Engine.State.Message</div>
+            <button class="spin-button" @onclick="SpinAsync" disabled="@Engine.State.IsSpinning">
+                <span>@(Engine.State.IsSpinning ? "ROLLING…" : "SPIN THE WHEEL")</span>
+                <small>@(Engine.State.Point is null ? "COME-OUT ROLL" : $"POINT IS {Engine.State.Point}")</small>
+            </button>
+        </section>
+
+        <section class="betting-panel">
+            <div class="panel-heading">
+                <div><p class="eyebrow">LAY YOUR CHIPS</p><h2>Craps table</h2></div>
+                <button class="text-button" @onclick="ClearBets" disabled="@(Engine.State.IsSpinning || Engine.State.Bets.Count == 0)">Clear bets</button>
+            </div>
+
+            <div class="number-grid">
+                @foreach (var target in NumberTargets)
+                {
+                    var number = (int)target;
+                    <button class="bet-spot @(Engine.State.Bets.ContainsKey(target) ? "has-bet" : "")" @onclick="() => PlaceBet(target)" disabled="@Engine.State.IsSpinning">
+                        <span class="number">@number</span>
+                        <span class="odds">@OddsLabel(number)</span>
+                        @if (Engine.State.Bets.TryGetValue(target, out var amount)) { <span class="placed">@Money(amount)</span> }
+                    </button>
+                }
+                <button class="bet-spot dont @(Engine.State.Bets.ContainsKey(BetTarget.DontPass) ? "has-bet" : "")" @onclick="() => PlaceBet(BetTarget.DontPass)" disabled="@Engine.State.IsSpinning">
+                    <span class="number">7</span><span class="odds">DON’T PASS · 1:1</span>
+                    @if (Engine.State.Bets.TryGetValue(BetTarget.DontPass, out var dontAmount)) { <span class="placed">@Money(dontAmount)</span> }
+                </button>
+            </div>
+
+            <p class="section-label">HARDWAYS · STAY UP UNTIL EASY OR SEVEN</p>
+            <div class="hardway-grid">
+                @foreach (var target in HardTargets)
+                {
+                    var number = (int)target - 100;
+                    <button class="bet-spot hard @(Engine.State.Bets.ContainsKey(target) ? "has-bet" : "")" @onclick="() => PlaceBet(target)" disabled="@Engine.State.IsSpinning">
+                        <span class="number">H@(number)</span><span class="odds">@(number is 4 or 10 ? "7:1" : "9:1")</span>
+                        @if (Engine.State.Bets.TryGetValue(target, out var amount)) { <span class="placed">@Money(amount)</span> }
+                    </button>
+                }
+            </div>
+
+            <div class="chip-rack">
+                <span class="section-label">CHIP VALUE</span>
+                @foreach (var chip in Chips)
+                {
+                    <button class="chip chip-@chip @(Engine.State.Player.SelectedChip == chip ? "selected" : "")" @onclick="() => SelectChip(chip)" aria-label="Select $@chip chip">$@chip</button>
+                }
+            </div>
+
+            <details class="rules">
+                <summary>How the table pays</summary>
+                <p>Every wheel slot is one dice combination: 36 equal chances. Place bets stay up, pay 9:5 on 4/10, 7:5 on 5/9, and 7:6 on 6/8, but all lose on seven. The 2/3/11/12 bets last one spin. Hardways lose to an easy version or seven.</p>
+                <p>The 7 / Don’t bet uses Don’t Pass rules: on the come-out, 2 or 3 wins, 7 or 11 loses, and 12 pushes. After a point is set, seven wins and the point loses.</p>
+            </details>
+        </section>
+    </main>
+
+    @if (Engine.State.History.Count > 0)
+    {
+        <aside class="history"><span>RECENT</span>@foreach (var item in Engine.State.History) { <p>@item</p> }</aside>
+    }
+</div>
+
+@code {
+    private readonly GameEngine Engine = new();
+    private IJSObjectReference? _module;
+    private static readonly decimal[] Chips = [5m, 10m, 25m, 100m];
+    private static readonly BetTarget[] NumberTargets = [BetTarget.Number2, BetTarget.Number3, BetTarget.Number4, BetTarget.Number5, BetTarget.Number6, BetTarget.Number8, BetTarget.Number9, BetTarget.Number10, BetTarget.Number11, BetTarget.Number12];
+    private static readonly BetTarget[] HardTargets = [BetTarget.Hard4, BetTarget.Hard6, BetTarget.Hard8, BetTarget.Hard10];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/diceWheel.js");
+        await _module.InvokeVoidAsync("initialize", "dice-wheel", WheelView());
+    }
+
+    private async Task SpinAsync()
+    {
+        if (Engine.State.IsSpinning || _module is null) return;
+        Engine.State.IsSpinning = true;
+        Engine.State.Message = "The wheel is turning…";
+        StateHasChanged();
+
+        var outcome = Engine.PickOutcome();
+        await _module.InvokeVoidAsync("spinTo", outcome.Index, 2400);
+        Engine.Resolve(outcome.Slot);
+        Engine.State.IsSpinning = false;
+        await _module.InvokeVoidAsync("updateCenter", WheelView());
+    }
+
+    private void PlaceBet(BetTarget target) => Engine.PlaceBet(target);
+    private void ClearBets() => Engine.ClearBets();
+    private void SelectChip(decimal value) => Engine.State.Player.SelectedChip = value;
+    private static string Money(decimal value) => $"${value:0.##}";
+    private static string OddsLabel(int number) => number switch { 2 or 12 => "ONE ROLL · 30:1", 3 or 11 => "ONE ROLL · 15:1", 4 or 10 => "PLACE · 9:5", 5 or 9 => "PLACE · 7:5", 6 or 8 => "PLACE · 7:6", _ => "" };
+
+    private object WheelView() => new
+    {
+        slots = Engine.Wheel.Select(slot => new { slot.Total, slot.IsHard, slot.Label }),
+        lastTotal = Engine.State.LastResult?.Total,
+        dieOne = Engine.State.LastResult?.DieOne,
+        dieTwo = Engine.State.LastResult?.DieTwo,
+        point = Engine.State.Point
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null) await _module.DisposeAsync();
+    }
+}
