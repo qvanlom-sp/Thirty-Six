@@ -6,7 +6,10 @@ public enum PowerId
     PlayItSafe,
     LuckyFives,
     NothingEasy,
-    ExtraLife
+    ExtraLife,
+    PointPress,
+    HotHand,
+    BankrollGuard
 }
 
 public sealed record PowerDefinition(

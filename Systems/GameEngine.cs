@@ -6,15 +6,39 @@ namespace Casino_Game.Systems;
 public sealed class GameEngine
 {
     private static readonly HashSet<int> PointNumbers = [4, 5, 6, 8, 9, 10];
+    private static readonly HashSet<int> BetNumbers = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
     private static readonly BetTarget[] HardTargets = [BetTarget.Hard4, BetTarget.Hard6, BetTarget.Hard8, BetTarget.Hard10];
 
     public static readonly IReadOnlyList<PowerDefinition> PowerDefinitions =
     [
-        new(PowerId.HiLo, "Hi / Lo", "For one round, winning 2 and 12 bets pay five times their normal prize.", 150m, 2, "↕"),
-        new(PowerId.PlayItSafe, "Play It Safe", "Blocks three of the six red 7 slots for your next three spins.", 250m, 2, "◆"),
         new(PowerId.LuckyFives, "Lucky 5s", "All winning 5 bets pay double for the rest of this round.", 300m, 2, "★"),
-        new(PowerId.NothingEasy, "Nothing Easy", "Hardway wins pay double for the rest of this round.", 400m, 3, "H"),
-        new(PowerId.ExtraLife, "Extra Life", "The next 7 is ignored. Your bets survive and the round continues.", 1000m, 4, "♥")
+        new(PowerId.HiLo, "Hi / Lo", "For one round, winning 2 and 12 bets pay five times their normal prize.", 450m, 3, "↕"),
+        new(PowerId.NothingEasy, "Nothing Easy", "Hardway wins pay double for the rest of this round.", 550m, 3, "H"),
+        new(PowerId.PointPress, "Point Press", "Point-number wins pay another 50% for this round.", 650m, 3, "P"),
+        new(PowerId.HotHand, "Hot Hand", "Your next winning number or hardway spin pays 75% more.", 750m, 3, "♨"),
+        new(PowerId.BankrollGuard, "Bankroll Guard", "A seven-out returns 25% of the chips that were on the table.", 900m, 3, "▣"),
+        new(PowerId.PlayItSafe, "Play It Safe", "Blocks three of the six red 7 slots for your next three spins.", 1250m, 3, "◆"),
+        new(PowerId.ExtraLife, "Extra Life", "The next 7 is ignored. Your bets survive and the round continues.", 2000m, 5, "♥")
+    ];
+
+    public static readonly IReadOnlyList<RoundCard> CardDeck =
+    [
+        new("Low Road", "2·3", "violet", "+15% payout on 2 and 3.", CardEffect.LowNumbers, .15m),
+        new("High Road", "J·Q", "purple", "+15% payout on 11 and 12.", CardEffect.HighNumbers, .15m),
+        new("Green Pair", "6·8", "green", "+5% payout on 6 and 8.", CardEffect.SixEight, .05m),
+        new("Blue Line", "4·10", "blue", "+8% payout on 4 and 10.", CardEffect.FourTen, .08m),
+        new("Teal Tide", "5·9", "teal", "+8% payout on 5 and 9.", CardEffect.FiveNine, .08m),
+        new("Safety Net", "20%", "red", "Keep 20% of your table balance on seven-out.", CardEffect.SafetyNet, .20m),
+        new("Missing Red", "−7", "red", "One of the six 7 slots is blocked this round.", CardEffect.BlockSeven, 1m),
+        new("Hard Earned", "H", "gold", "+15% on hardway wins.", CardEffect.Hardways, .15m),
+        new("Point Player", "●", "gold", "+10% on point-number wins.", CardEffect.PointBoost, .10m),
+        new("Hot Start", "ⅠⅡⅢ", "red", "+10% on wins during the first three spins.", CardEffect.HotStart, .10m),
+        new("Even Keel", "2·4·6", "green", "+5% on even-number wins.", CardEffect.EvenNumbers, .05m),
+        new("Odd Company", "3·5·9", "purple", "+5% on odd-number wins.", CardEffect.OddNumbers, .05m),
+        new("Small Stakes", "$10", "teal", "+8% on winning wagers of $10 or less.", CardEffect.SmallStakes, .08m),
+        new("Big Stakes", "$25+", "blue", "+6% on winning wagers of $25 or more.", CardEffect.BigStakes, .06m),
+        new("Table Favor", "+3%", "gold", "+3% on every number and hardway win.", CardEffect.AllNumbers, .03m),
+        new("Pocket Chip", "$10", "green", "Receive $10 immediately when dealt.", CardEffect.PocketChip, 10m)
     ];
 
     public GameEngine()
@@ -35,6 +59,8 @@ public sealed class GameEngine
 
         State.Player.Bankroll -= chip;
         State.Bets[target] = State.Bets.GetValueOrDefault(target) + chip;
+        State.Stats.TotalWagered += chip;
+        State.Stats.WageredByTarget[target] = State.Stats.WageredByTarget.GetValueOrDefault(target) + chip;
         State.Message = $"${chip:0} placed on {GetName(target)}. Spin when you’re ready.";
         return true;
     }
@@ -66,13 +92,19 @@ public sealed class GameEngine
         if (State.Phase == GamePhase.ComeOut)
             return !PointNumbers.Contains(Wheel[index].Total);
 
+        if (Wheel[index].Total != 7)
+            return false;
+
         var safe = State.Upgrades.Powers[PowerId.PlayItSafe];
-        if (!safe.IsActive || safe.SpinsRemaining <= 0 || Wheel[index].Total != 7)
+        var blockedSevens = State.ActiveCards.Any(card => card.Effect == CardEffect.BlockSeven) ? 1 : 0;
+        if (safe.IsActive && safe.SpinsRemaining > 0)
+            blockedSevens += 3;
+        if (blockedSevens == 0)
             return false;
 
         return Wheel.Select((slot, slotIndex) => (slot, slotIndex))
             .Where(item => item.slot.Total == 7)
-            .Take(3)
+            .Take(blockedSevens)
             .Any(item => item.slotIndex == index);
     }
 
@@ -86,30 +118,77 @@ public sealed class GameEngine
             return true;
         if (powers[PowerId.NothingEasy].IsActive && slot.IsHard)
             return true;
+        if (powers[PowerId.PointPress].IsActive && State.Point == slot.Total)
+            return true;
+        if (powers[PowerId.HotHand].IsActive && slot.Total != 7)
+            return true;
         if (powers[PowerId.ExtraLife].IsActive && slot.Total == 7)
             return true;
+        if (powers[PowerId.BankrollGuard].IsActive && slot.Total == 7)
+            return true;
         return powers[PowerId.PlayItSafe].IsActive && IsSlotBlocked(index);
+    }
+
+    public bool IsSlotCardAffected(int index) => IsNumberCardAffected(Wheel[index].Total, Wheel[index].IsHard);
+
+    public bool IsSlotWagered(WheelSlot slot)
+    {
+        if (slot.Total == 7)
+            return State.Bets.ContainsKey(BetTarget.Seven);
+
+        var hasNumberBet = BetNumbers.Contains(slot.Total) && State.Bets.ContainsKey((BetTarget)slot.Total);
+        if (!slot.IsHard)
+            return hasNumberBet;
+
+        var hardTarget = (BetTarget)(slot.Total + 100);
+        return hasNumberBet || State.Bets.ContainsKey(hardTarget);
+    }
+
+    public bool IsNumberCardAffected(int number, bool isHard = false)
+    {
+        return State.ActiveCards.Any(card => card.Effect switch
+        {
+            CardEffect.LowNumbers => number is 2 or 3,
+            CardEffect.HighNumbers => number is 11 or 12,
+            CardEffect.SixEight => number is 6 or 8,
+            CardEffect.FourTen => number is 4 or 10,
+            CardEffect.FiveNine => number is 5 or 9,
+            CardEffect.BlockSeven or CardEffect.SafetyNet => number == 7,
+            CardEffect.Hardways => isHard,
+            CardEffect.PointBoost => number == State.Point,
+            CardEffect.HotStart => number != 7 && State.SpinsThisRound < 3,
+            CardEffect.SmallStakes or CardEffect.BigStakes or CardEffect.AllNumbers => number != 7,
+            CardEffect.EvenNumbers => number != 7 && number % 2 == 0,
+            CardEffect.OddNumbers => number != 7 && number % 2 != 0,
+            _ => false
+        });
     }
 
     public void Resolve(WheelSlot result)
     {
         ResetResultEffects();
         State.LastResult = result;
+        State.Stats.Spins++;
 
         if (State.Phase == GamePhase.ComeOut)
         {
             State.Point = result.Total;
             State.Phase = GamePhase.BettingRound;
-            State.Message = $"The point is {result.Total}. Betting is now open.";
+            State.SpinsThisRound = 0;
+            DealCards();
+            State.Message = $"The point is {result.Total}. You drew {State.ActiveCards[0].Name} and {State.ActiveCards[1].Name}.";
             AddHistory(State.Message);
+            CheckVictory();
             return;
         }
 
         if (State.Phase != GamePhase.BettingRound)
             return;
 
+        State.SpinsThisRound++;
         var notes = new List<string>();
-        ResolveOneSpinBets(result, notes);
+        var tableBeforeSpin = State.TotalOnTable;
+        ResolveSevenBet(result, notes);
 
         if (result.Total == 7 && ConsumeExtraLife())
         {
@@ -117,20 +196,26 @@ public sealed class GameEngine
             State.ExtraLifeSaved = true;
             TickSpinPowers();
             State.Message = "Extra Life! The 7 was erased, your bets survived, and the round continues.";
+            FinalizeSpinStats();
             AddHistory(State.Message);
             return;
         }
 
+        var payoutBeforeNumberWinnings = State.LastPayout;
         ResolvePlaceBets(result, notes);
         ResolveHardways(result, notes);
+        if (State.Upgrades.Powers[PowerId.HotHand].IsActive && State.LastPayout > payoutBeforeNumberWinnings)
+            State.Upgrades.Powers[PowerId.HotHand].IsActive = false;
         TickSpinPowers();
 
         if (result.Total == 7)
         {
             State.LastWasSeven = true;
+            var protectedAmount = ApplySevenProtection(tableBeforeSpin);
             EndRound();
-            var payoutText = State.LastPayout > 0 ? $" Your 7 bet won {Money(State.LastPayout)}." : string.Empty;
-            State.Message = $"Seven out. The round is over.{payoutText}";
+            var payoutText = State.LastPayout > 0 ? $" {Money(State.LastPayout)} returned or won." : string.Empty;
+            var protectionText = protectedAmount > 0 ? " Your protection card or power saved part of the table." : string.Empty;
+            State.Message = $"Seven out. The round is over.{payoutText}{protectionText}";
         }
         else if (State.LastPayout > 0)
         {
@@ -147,6 +232,7 @@ public sealed class GameEngine
             State.Message = $"{result.Total} landed. No payout this spin—your place bets stay up.";
         }
 
+        FinalizeSpinStats();
         AddHistory(State.Message);
     }
 
@@ -205,6 +291,7 @@ public sealed class GameEngine
         State.Phase = GamePhase.ComeOut;
         State.Point = null;
         State.LastResult = null;
+        State.ActiveCards.Clear();
         ResetResultEffects();
         State.Message = "Come-out spin: the highlighted point numbers are the only possible results.";
     }
@@ -219,25 +306,36 @@ public sealed class GameEngine
         State.Message = "Shift complete. You earned $200—spend carefully.";
     }
 
+    public void ContinueAfterVictory() => State.ShowVictory = false;
+
+    public string MostBetName()
+    {
+        if (State.Stats.WageredByTarget.Count == 0)
+            return "None yet";
+        return GetName(State.Stats.WageredByTarget.MaxBy(item => item.Value).Key);
+    }
+
     public decimal PayoutMultiplier(int number) => 1m + State.Upgrades.PayoutLevels.GetValueOrDefault(number) * .1m;
 
-    private void ResolveOneSpinBets(WheelSlot result, List<string> notes)
+    public int TotalPayoutBonusPercent(int number, decimal wager, bool isHard = false)
     {
-        foreach (var number in new[] { 2, 3, 11, 12 })
-        {
-            var target = (BetTarget)number;
-            if (!State.Bets.Remove(target, out var wager))
-                continue;
-            if (result.Total != number)
-                continue;
+        var multiplier = (isHard ? 1m : PayoutMultiplier(number))
+            * PointBonus(number)
+            * PowerPayoutMultiplier(number, isHard)
+            * CardPayoutMultiplier(number, wager, isHard, true);
+        return (int)decimal.Round((multiplier - 1m) * 100m, 0, MidpointRounding.AwayFromZero);
+    }
 
-            var odds = number is 2 or 12 ? 30m : 15m;
-            if (number is 2 or 12 && State.Upgrades.Powers[PowerId.HiLo].IsActive)
-                odds *= 5m;
-            Award(wager, odds, true);
-            notes.Add($"{number} won {Money(wager * odds)}.");
-        }
+    public int SevenProtectionPercent()
+    {
+        var rate = State.ActiveCards.Where(card => card.Effect == CardEffect.SafetyNet).Sum(card => card.Value);
+        if (State.Upgrades.Powers[PowerId.BankrollGuard].IsActive)
+            rate += .25m;
+        return (int)decimal.Round(rate * 100m, 0, MidpointRounding.AwayFromZero);
+    }
 
+    private void ResolveSevenBet(WheelSlot result, List<string> notes)
+    {
         if (!State.Bets.Remove(BetTarget.Seven, out var sevenWager))
             return;
         if (result.Total == 7)
@@ -252,7 +350,7 @@ public sealed class GameEngine
         foreach (var (target, wager) in State.Bets.ToArray())
         {
             var number = (int)target;
-            if (!PointNumbers.Contains(number))
+            if (!BetNumbers.Contains(number))
                 continue;
 
             if (result.Total == 7)
@@ -261,9 +359,8 @@ public sealed class GameEngine
             }
             else if (result.Total == number)
             {
-                var odds = PlaceOdds(number) * PayoutMultiplier(number) * PointBonus(number);
-                if (number == 5 && State.Upgrades.Powers[PowerId.LuckyFives].IsActive)
-                    odds *= 2m;
+                var odds = PlaceOdds(number) * PayoutMultiplier(number) * PointBonus(number)
+                    * PowerPayoutMultiplier(number, false) * CardPayoutMultiplier(number, wager, false);
                 Award(wager, odds, false);
                 notes.Add($"{number} paid {Money(wager * odds)}.");
             }
@@ -281,9 +378,8 @@ public sealed class GameEngine
             if (result.Total == number && result.IsHard)
             {
                 var odds = number is 4 or 10 ? 7m : 9m;
-                if (State.Upgrades.Powers[PowerId.NothingEasy].IsActive)
-                    odds *= 2m;
-                odds *= PointBonus(number);
+                odds *= PointBonus(number)
+                    * PowerPayoutMultiplier(number, true) * CardPayoutMultiplier(number, wager, true);
                 Award(wager, odds, false);
                 notes.Add($"Hard {number} paid {Money(wager * odds)}.");
             }
@@ -299,6 +395,86 @@ public sealed class GameEngine
         var profit = decimal.Round(wager * odds, 2);
         State.Player.Bankroll += profit + (returnStake ? wager : 0m);
         State.LastPayout += profit;
+    }
+
+    private decimal CardPayoutMultiplier(int number, decimal wager, bool isHard, bool previewNextSpin = false)
+    {
+        var bonus = State.ActiveCards.Sum(card => card.Effect switch
+        {
+            CardEffect.LowNumbers when number is 2 or 3 => card.Value,
+            CardEffect.HighNumbers when number is 11 or 12 => card.Value,
+            CardEffect.SixEight when number is 6 or 8 => card.Value,
+            CardEffect.FourTen when number is 4 or 10 => card.Value,
+            CardEffect.FiveNine when number is 5 or 9 => card.Value,
+            CardEffect.Hardways when isHard => card.Value,
+            CardEffect.PointBoost when number == State.Point => card.Value,
+            CardEffect.HotStart when (previewNextSpin ? State.SpinsThisRound < 3 : State.SpinsThisRound <= 3) => card.Value,
+            CardEffect.EvenNumbers when number % 2 == 0 => card.Value,
+            CardEffect.OddNumbers when number % 2 != 0 => card.Value,
+            CardEffect.SmallStakes when wager <= 10m => card.Value,
+            CardEffect.BigStakes when wager >= 25m => card.Value,
+            CardEffect.AllNumbers => card.Value,
+            _ => 0m
+        });
+        return 1m + bonus;
+    }
+
+    private decimal PowerPayoutMultiplier(int number, bool isHard)
+    {
+        var powers = State.Upgrades.Powers;
+        var multiplier = 1m;
+        if (powers[PowerId.LuckyFives].IsActive && number == 5)
+            multiplier *= 2m;
+        if (powers[PowerId.HiLo].IsActive && number is 2 or 12)
+            multiplier *= 5m;
+        if (powers[PowerId.NothingEasy].IsActive && isHard)
+            multiplier *= 2m;
+        if (powers[PowerId.PointPress].IsActive && number == State.Point)
+            multiplier *= 1.5m;
+        if (powers[PowerId.HotHand].IsActive)
+            multiplier *= 1.75m;
+        return multiplier;
+    }
+
+    private void DealCards()
+    {
+        State.ActiveCards.Clear();
+        var available = CardDeck.ToList();
+        for (var count = 0; count < 2; count++)
+        {
+            var index = RandomNumberGenerator.GetInt32(available.Count);
+            var card = available[index];
+            available.RemoveAt(index);
+            State.ActiveCards.Add(card);
+            if (card.Effect == CardEffect.PocketChip)
+                State.Player.Bankroll += card.Value;
+        }
+    }
+
+    private decimal ApplySevenProtection(decimal tableBalance)
+    {
+        var rate = State.ActiveCards.Where(card => card.Effect == CardEffect.SafetyNet).Sum(card => card.Value);
+        if (State.Upgrades.Powers[PowerId.BankrollGuard].IsActive)
+            rate += .25m;
+        var saved = decimal.Round(tableBalance * rate, 2);
+        State.Player.Bankroll += saved;
+        State.LastPayout += saved;
+        return saved;
+    }
+
+    private void FinalizeSpinStats()
+    {
+        State.Stats.TotalWon += State.LastPayout;
+        State.Stats.BiggestSingleSpinPayout = Math.Max(State.Stats.BiggestSingleSpinPayout, State.LastPayout);
+        CheckVictory();
+    }
+
+    private void CheckVictory()
+    {
+        if (State.GoalReached || State.Player.Bankroll < 20_000m)
+            return;
+        State.GoalReached = true;
+        State.ShowVictory = true;
     }
 
     private bool ConsumeExtraLife()
@@ -319,6 +495,7 @@ public sealed class GameEngine
 
     private void EndRound()
     {
+        State.Stats.RoundsCompleted++;
         State.Point = null;
         State.Bets.Clear();
         foreach (var definition in PowerDefinitions)
@@ -359,6 +536,8 @@ public sealed class GameEngine
 
     private static decimal PlaceOdds(int number) => number switch
     {
+        2 or 12 => 11m / 2m,
+        3 or 11 => 11m / 4m,
         4 or 10 => 9m / 5m,
         5 or 9 => 7m / 5m,
         6 or 8 => 7m / 6m,

@@ -105,6 +105,15 @@ function draw() {
             ctx.stroke();
             ctx.restore();
         }
+        if (slot.carded && !slot.powered) {
+            ctx.save();
+            ctx.shadowColor = "#86ead9";
+            ctx.shadowBlur = 12;
+            ctx.strokeStyle = "#cafff6";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        }
 
         const middle = start + arc / 2;
         ctx.save();
@@ -117,6 +126,20 @@ function draw() {
         ctx.textBaseline = "middle";
         ctx.fillText(slot.blocked ? "×" : slot.label, 0, 0);
         ctx.restore();
+
+        if (slot.wagered && !slot.blocked) {
+            ctx.save();
+            ctx.rotate(middle);
+            ctx.translate(radius * .58, 0);
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.max(4, size * .009), 0, Math.PI * 2);
+            ctx.fillStyle = "#f6d568";
+            ctx.fill();
+            ctx.strokeStyle = "#3f3008";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.restore();
+        }
     });
 
     ctx.beginPath();
