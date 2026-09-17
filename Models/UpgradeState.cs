@@ -1,9 +1,13 @@
 namespace Casino_Game.Models;
 
-// A deliberately small extension point for later unlocks, power-ups, and progression.
 public sealed class UpgradeState
 {
-    public int LuckLevel { get; set; }
     public int TableLevel { get; set; } = 1;
-    public HashSet<string> UnlockedPowerUps { get; } = [];
+    public Dictionary<int, int> PayoutLevels { get; } = new()
+    {
+        [4] = 0, [5] = 0, [6] = 0, [8] = 0, [9] = 0, [10] = 0
+    };
+
+    public Dictionary<PowerId, PowerState> Powers { get; } = Enum.GetValues<PowerId>()
+        .ToDictionary(id => id, _ => new PowerState());
 }

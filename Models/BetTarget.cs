@@ -7,7 +7,7 @@ public enum BetTarget
     Number4 = 4,
     Number5 = 5,
     Number6 = 6,
-    DontPass = 7,
+    Seven = 7,
     Number8 = 8,
     Number9 = 9,
     Number10 = 10,

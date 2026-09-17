@@ -1,6 +1,6 @@
 # Thirty-Six
 
-A browser-only Blazor WebAssembly prototype combining a 36-slot roulette wheel with craps probabilities and payouts. All game rules and bankroll state live in C#; JavaScript only renders and animates the Canvas wheel.
+A browser-only Blazor WebAssembly game combining a 36-slot roulette wheel with craps probabilities, persistent upgrades, and reusable power-ups. All game rules and bankroll state live in C#; JavaScript only renders and animates the Canvas wheel and ball.
 
 ## Run locally
 
@@ -16,4 +16,4 @@ Push to `main`, then select **GitHub Actions** as the Pages source in the reposi
 
 ## Probability and payouts
 
-The wheel contains all 36 ordered two-dice combinations, so totals occur with exact dice frequency (one 2, six 7s, one 12, and so on). Place, proposition, hardway, and Don’t Pass payouts mirror common craps rules. Future upgrades belong in `Models/UpgradeState.cs` and can modify game behavior through `Systems/GameEngine.cs` without moving core logic into JavaScript.
+The wheel contains all 36 ordered two-dice combinations, so totals occur with exact dice frequency (one 2, six evenly spaced 7s, one 12, and so on). A safe come-out spin chooses the point from 4/5/6/8/9/10, betting remains open until a red 7 ends the round, and the shop then offers permanent number upgrades and power unlocks. The point pays a 1.5× bonus whenever it hits, including hardways. Players below $5 can complete a short manual dishwashing bailout for $200.
