@@ -11,6 +11,7 @@
         <div>
             <p class="eyebrow">THE DICE WHEEL</p>
             <h1>THIRTY<span>—SIX</span></h1>
+            <button class="tutorial-reopen" @onclick="OpenTutorial">HOW TO PLAY</button>
         </div>
         <div class="status-strip">
             <div><small>BANKROLL</small><strong>@Money(Engine.State.Player.Bankroll)</strong></div>
@@ -33,17 +34,21 @@
         <section class="wheel-panel">
             <div class="wheel-wrap">
                 <canvas id="dice-wheel" aria-label="A roulette wheel with 36 equally likely dice combinations"></canvas>
-                @if (Engine.State.LastPayout > 0)
+                @if (Engine.State.LastPayout > 0 && !Engine.State.LastWasSeven)
                 {
-                    <div class="payout-pop">+@Money(Engine.State.LastPayout)</div>
+                    <div class="payout-pop @(Engine.State.LastLoss > 0 ? "with-loss" : "")">+@Money(Engine.State.LastPayout)</div>
                 }
                 @if (Engine.State.LastWasSeven && !Engine.State.ExtraLifeSaved)
                 {
-                    <div class="seven-slam">SEVEN OUT</div>
+                    <div class="seven-slam"><span>SEVEN OUT</span><strong>-@Money(Engine.State.LastLoss)</strong><small>LOST FROM TABLE</small></div>
                 }
                 @if (Engine.State.ExtraLifeSaved)
                 {
                     <div class="life-save">♥ SAVED</div>
+                }
+                @if (Engine.State.LastLoss > 0 && !Engine.State.LastWasSeven)
+                {
+                    <div class="loss-pop"><strong>-@Money(Engine.State.LastLoss)</strong><small>HARDWAY LOST · EASY @Engine.State.LastResult?.Total</small></div>
                 }
             </div>
             <div class="result-banner" aria-live="polite">@Engine.State.Message</div>
@@ -78,7 +83,7 @@
             <section class="betting-panel">
                 <div class="panel-heading">
                     <div><p class="eyebrow">STEP 2 · BETTING IS OPEN</p><h2>Pick your numbers</h2></div>
-                    <button class="text-button" @onclick="ClearBetsAsync" disabled="@(Engine.State.IsSpinning || Engine.State.Bets.Count == 0)">Return chips</button>
+                    <button class="text-button return-chips" @onclick="ClearBetsAsync" disabled="@(Engine.State.IsSpinning || Engine.State.Bets.Count == 0)">Return all chips</button>
                 </div>
 
                 <div class="card-hand">
@@ -115,28 +120,35 @@
                         var number = (int)target;
                         <button class="bet-spot n-@number @PowerGlowClass(number) @CardGlowClass(number) @(Engine.State.Bets.ContainsKey(target) ? "has-bet" : "") @(Engine.State.LastWinNumber == number ? "winner" : "")" @onclick="() => PlaceBetAsync(target)" disabled="@Engine.State.IsSpinning">
                             <span class="number">@number</span>
-                            <span class="odds">@OddsLabel(number)</span>
+                            <span class="odds"><small>PAYS</small><strong>@PayoutRatio(number)</strong></span>
                             @if (Engine.State.Point == number) { <span class="point-boost">POINT · ×1.5</span> }
                             @{ var totalBonus = TableBonus(number, target); }
                             @if (totalBonus > 0) { <span class="boost">+@totalBonus%</span> }
                             @if (Engine.State.Bets.TryGetValue(target, out var amount)) { <span class="placed">@Money(amount)</span> }
                         </button>
                     }
+                    <button class="bet-spot all-bet @(Engine.State.AllNumbersBetTotal > 0 ? "has-bet" : "")" @onclick="PlaceBetAcrossNumbersAsync" disabled="@Engine.State.IsSpinning">
+                        <span class="number">ALL</span>
+                        <span class="odds"><small>SPREADS</small><strong>10% EACH</strong></span>
+                        <span class="help">2–12 EXCEPT 7</span>
+                        @if (Engine.State.AllNumbersBetTotal > 0) { <span class="placed">@Money(Engine.State.AllNumbersBetTotal)</span> }
+                    </button>
                     <button class="bet-spot n-7 seven-bet @PowerGlowClass(7) @CardGlowClass(7) @(Engine.State.Bets.ContainsKey(BetTarget.Seven) ? "has-bet" : "") @(Engine.State.LastWinNumber == 7 ? "winner" : "")" @onclick="() => PlaceBetAsync(BetTarget.Seven)" disabled="@Engine.State.IsSpinning">
-                        <span class="number">7</span><span class="odds">ONE SPIN · PAYS 4:1</span>
-                        <span class="help">Wins only if the very next spin is 7</span>
+                        <span class="number">7</span><span class="odds seven-odds"><small>PAYS</small><strong>4:1</strong></span>
+                        <span class="help">ONE SPIN ONLY</span>
                         @if (Engine.SevenProtectionPercent() > 0) { <span class="boost">SAVE @Engine.SevenProtectionPercent()%</span> }
                         @if (Engine.State.Bets.TryGetValue(BetTarget.Seven, out var sevenAmount)) { <span class="placed">@Money(sevenAmount)</span> }
                     </button>
                 </div>
 
-                <p class="section-label">HARDWAYS · BOTH DICE MUST MATCH</p>
+                <p class="section-label">HARDWAYS · MATCHING DICE WIN · EASY VERSION OR 7 LOSES</p>
                 <div class="hardway-grid">
                     @foreach (var target in HardTargets)
                     {
                         var number = (int)target - 100;
                         <button class="bet-spot hard n-@number @PowerGlowClass(number, true) @CardGlowClass(number, true) @(Engine.State.Bets.ContainsKey(target) ? "has-bet" : "") @(Engine.State.LastWinNumber == number && Engine.State.LastResult?.IsHard == true ? "winner" : "")" @onclick="() => PlaceBetAsync(target)" disabled="@Engine.State.IsSpinning">
-                            <span class="number">H@(number)</span><span class="odds">@(number is 4 or 10 ? "PAYS 7:1" : "PAYS 9:1")</span>
+                            <span class="number">H@(number)</span><span class="odds"><small>PAYS</small><strong>@(number is 4 or 10 ? "7:1" : "9:1")</strong></span>
+                            <span class="help">EASY @number LOSES</span>
                             @if (Engine.State.Point == number) { <span class="point-boost">POINT · ×1.5</span> }
                             @{ var totalBonus = TableBonus(number, target, true); }
                             @if (totalBonus > 0) { <span class="boost">+@totalBonus%</span> }
@@ -155,8 +167,10 @@
 
                 <details class="rules">
                     <summary>New to craps? Read the simple rules</summary>
-                    <p><b>Green 6/8</b> hit often and pay 7:6. <b>Blue 5/9</b> pay 7:5. <b>Gold 4/10</b> are harder and pay 9:5. Those bets stay until you return them or a red 7 appears.</p>
-                    <p><b>Purple 2/3/11/12</b> are crapless place bets: they stay up too, paying 11:2 on 2/12 and 11:4 on 3/11. Only the <b>red 7</b> bet lasts one spin. Hardways win when both dice match.</p>
+                    <p><b>Green 6/8</b> hit often and pay 7:6. <b>Teal 5/9</b> pay 7:5. <b>Blue 4/10</b> are harder and pay 9:5. These bets stay on the table until you return them or seven-out.</p>
+                    <p><b>Violet 2/12</b> and <b>purple 3/11</b> are persistent crapless number bets. The yellow badge shows the complete payout boost from upgrades, the point, your cards, and active powers.</p>
+                    <p><b>All Numbers</b> divides one selected chip evenly across all ten non-7 numbers. Each number receives exactly 10% of the chip and remains an ordinary number bet afterward.</p>
+                    <p>Only the <b>red 7</b> bet lasts one spin. It pays 4:1 if the next result is 7. Hardways win only when both dice match and lose when their number lands the easy way.</p>
                 </details>
             </section>
         }
@@ -164,7 +178,7 @@
         {
             <section class="betting-panel shop-panel">
                 <div class="panel-heading"><div><p class="eyebrow">STEP 3 · BETWEEN ROUNDS</p><h2>The Back Room</h2></div><span class="shop-cash">@Money(Engine.State.Player.Bankroll)</span></div>
-                <p class="friendly-copy">Upgrades are permanent. Power-ups unlock permanently too, then can be activated during a round after their cooldown.</p>
+                <p class="friendly-copy">Number upgrades permanently improve payouts. Power-ups are permanent unlocks: activate each once per eligible round, then wait out its round-based cooldown.</p>
                 <button class="spin-button next-round" @onclick="LeaveShopAsync"><span>START NEXT ROUND</span><small>RETURN TO THE COME-OUT</small></button>
 
                 <p class="section-label">UPGRADE NUMBER PAYOUTS · +10% EACH LEVEL</p>
@@ -200,6 +214,34 @@
         <aside class="history"><span>RECENT</span>@foreach (var item in Engine.State.History) { <p>@item</p> }</aside>
     }
 </div>
+
+@if (_showTutorial)
+{
+    <div class="tutorial-overlay" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+        <section class="tutorial-card">
+            <button class="tutorial-skip" @onclick="CloseTutorial">SKIP TUTORIAL</button>
+            <p class="eyebrow">ORIENTATION · @(_tutorialStep + 1) / 4</p>
+            <div class="tutorial-mark">@TutorialIcon</div>
+            <h2 id="tutorial-title">@TutorialTitle</h2>
+            <p class="tutorial-copy">@TutorialCopy</p>
+            @if (_tutorialStep == 1)
+            {
+                <div class="tutorial-point"><span>POINT</span><strong>8</strong><b>×1.5</b></div>
+            }
+            @if (_tutorialStep == 3)
+            {
+                <div class="tutorial-goal"><small>YOUR OBJECTIVE</small><strong>$500 → $20,000</strong><span>Reach the goal, see your career stats, then continue endlessly if the wheel still calls.</span></div>
+            }
+            <div class="tutorial-progress" aria-label="Tutorial progress">
+                @for (var step = 0; step < 4; step++)
+                {
+                    <i class="@(step == _tutorialStep ? "active" : step < _tutorialStep ? "done" : "")"></i>
+                }
+            </div>
+            <button class="spin-button tutorial-next" @onclick="NextTutorial"><span>@(_tutorialStep == 3 ? "TAKE YOUR SEAT" : "CONTINUE")</span><small>@(_tutorialStep == 3 ? "THE HOUSE IS WAITING" : "NEXT LESSON")</small></button>
+        </section>
+    </div>
+}
 
 @if (Engine.State.Phase == GamePhase.Bailout)
 {
@@ -241,13 +283,15 @@
     private IJSObjectReference? _module;
     private bool _washing;
     private int _washProgress;
+    private bool _showTutorial = true;
+    private int _tutorialStep;
     private static readonly decimal[] Chips = [5m, 10m, 25m, 100m];
     private static readonly int[] PlaceNumbers = [4, 5, 6, 8, 9, 10];
     private static readonly int[] UpgradeNumbers = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
     private static readonly BetTarget[] NumberTargets = [BetTarget.Number2, BetTarget.Number3, BetTarget.Number4, BetTarget.Number5, BetTarget.Number6, BetTarget.Number8, BetTarget.Number9, BetTarget.Number10, BetTarget.Number11, BetTarget.Number12];
     private static readonly BetTarget[] HardTargets = [BetTarget.Hard4, BetTarget.Hard6, BetTarget.Hard8, BetTarget.Hard10];
 
-    private bool CanSpin => !Engine.State.IsSpinning && Engine.State.Phase is GamePhase.ComeOut or GamePhase.BettingRound;
+    private bool CanSpin => !_showTutorial && !Engine.State.IsSpinning && Engine.State.Phase is GamePhase.ComeOut or GamePhase.BettingRound;
     private int GoalProgress => Math.Min(100, (int)(Engine.State.Player.Bankroll / 200m));
     private string SpinLabel => Engine.State.IsSpinning ? "THE BALL IS SPINNING…" : Engine.State.Phase switch { GamePhase.ComeOut => "SET THE POINT", GamePhase.BettingRound => "SPIN THE WHEEL", _ => "SHOP OPEN" };
     private string SpinSubLabel => Engine.State.Phase switch { GamePhase.ComeOut => "SAFE SPIN · NO BETS", GamePhase.BettingRound => $"POINT {Engine.State.Point} · RED 7 ENDS THE ROUND", _ => "BUY UPGRADES TO CONTINUE" };
@@ -276,6 +320,12 @@
     private async Task PlaceBetAsync(BetTarget target)
     {
         if (Engine.PlaceBet(target) && _module is not null)
+            await _module.InvokeVoidAsync("updateState", WheelView());
+    }
+
+    private async Task PlaceBetAcrossNumbersAsync()
+    {
+        if (Engine.PlaceBetAcrossNumbers() && _module is not null)
             await _module.InvokeVoidAsync("updateState", WheelView());
     }
 
@@ -347,7 +397,29 @@
         return Engine.TotalPayoutBonusPercent(number, wager, isHard);
     }
     private static string Money(decimal value) => $"${value:0.##}";
-    private static string OddsLabel(int number) => number switch { 2 or 12 => "STAYS UP · 11:2", 3 or 11 => "STAYS UP · 11:4", 4 or 10 => "STAYS UP · 9:5", 5 or 9 => "STAYS UP · 7:5", 6 or 8 => "STAYS UP · 7:6", _ => "" };
+    private static string PayoutRatio(int number) => number switch { 2 or 12 => "11:2", 3 or 11 => "11:4", 4 or 10 => "9:5", 5 or 9 => "7:5", 6 or 8 => "7:6", _ => "" };
+    private string TutorialIcon => _tutorialStep switch { 0 => "36", 1 => "×1.5", 2 => "♟", _ => "$20K" };
+    private string TutorialTitle => _tutorialStep switch
+    {
+        0 => "Welcome to the House of Thirty-Six.",
+        1 => "The point becomes tonight’s favorite.",
+        2 => "Build your rail. Know what can fall.",
+        _ => "Take the house for twenty grand."
+    };
+    private string TutorialCopy => _tutorialStep switch
+    {
+        0 => "Every possible two-dice result lives on this wheel—thirty-six slots, no hidden number weights. You arrive with a $500 stake and an invitation the pit boss expects you to waste.",
+        1 => "Each round opens with one safe spin and no betting. Its result becomes the point. Every winning bet on that number—including its hardway—pays a 1.5× bonus for the entire round.",
+        2 => "Choose a chip, then choose numbers—or use All Numbers to spread 10% across each of the ten non-7 spots. Normal number bets remain until you return them or seven-out. A red 7 bet lasts one spin. Hardways need matching dice; the easy version knocks that hardway down.",
+        _ => "Seven-out sends you to the Back Room, where winnings become permanent payout upgrades and reusable powers. Cards reshape each round. Grow $500 into $20,000 and the House finally learns your name."
+    };
+    private void OpenTutorial() { _tutorialStep = 0; _showTutorial = true; }
+    private void CloseTutorial() => _showTutorial = false;
+    private void NextTutorial()
+    {
+        if (_tutorialStep < 3) _tutorialStep++;
+        else CloseTutorial();
+    }
 
     private object WheelView() => new
     {

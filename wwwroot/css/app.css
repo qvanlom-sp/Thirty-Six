@@ -8,6 +8,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #f5d36b; outlin
 .eyebrow, .section-label { margin: 0 0 6px; color: #c7b379; font-size: 10px; letter-spacing: .2em; text-transform: uppercase; }
 h1 { margin: 0; font: 400 clamp(42px, 6vw, 76px)/.96 Georgia, serif; letter-spacing: -.045em; }
 h1 span { color: #d4a72c; font-style: italic; }
+.tutorial-reopen { margin-top: 9px; padding: 5px 8px; color: #bfae7a; background: transparent; border: 1px solid #7d704d66; cursor: pointer; font-size: 10px; letter-spacing: .12em; }
 .status-strip { display: flex; align-items: stretch; border: 1px solid #8c7b554f; background: #0b100ee6; }
 .status-strip > div { min-width: 105px; padding: 11px 16px; border-left: 1px solid #8c7b554f; }
 .status-strip > div:first-child { border-left: 0; }
@@ -33,9 +34,16 @@ h1 span { color: #d4a72c; font-style: italic; }
 .spin-button { width: min(390px, 88%); padding: 15px 28px 13px; color: #121514; background: linear-gradient(180deg, #f2d574, #d6ae3f); border: 0; box-shadow: 0 8px 30px #0008; cursor: pointer; transition: transform .16s, filter .16s; }
 .spin-button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.12); }.spin-button:disabled { cursor: wait; opacity: .55; }
 .spin-button span, .spin-button small { display: block; }.spin-button span { font-weight: 700; letter-spacing: .1em; }.spin-button small { margin-top: 4px; font-size: 8px; opacity: .68; }
-.payout-pop, .seven-slam, .life-save { position: absolute; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; white-space: nowrap; font-weight: 900; text-shadow: 0 4px 12px #000; }
+.payout-pop, .seven-slam, .life-save, .loss-pop { position: absolute; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; white-space: nowrap; font-weight: 900; text-shadow: 0 4px 12px #000; }
 .payout-pop { color: #ffe178; font-size: clamp(32px, 5vw, 68px); animation: payout-pop 1s cubic-bezier(.17,.84,.44,1) both; }
+.payout-pop.with-loss { top: 40%; }
 .seven-slam { padding: 8px 20px; color: white; background: #a11920ed; border: 2px solid #ff8b8b; font-size: clamp(30px, 5vw, 64px); letter-spacing: .08em; animation: seven-slam .75s cubic-bezier(.2,.8,.3,1) both; }
+.seven-slam span, .seven-slam strong, .seven-slam small { display: block; }
+.seven-slam strong { margin-top: 3px; color: #fff1a8; font-size: .58em; letter-spacing: .02em; }
+.seven-slam small { margin-top: 2px; font-size: 11px; letter-spacing: .14em; }
+.seven-slam, .loss-pop { text-align: center; }
+.loss-pop { top: 63%; padding: 8px 14px; color: #fff; background: #8e2229ed; border: 1px solid #ff888d; animation: seven-slam .55s both; }
+.loss-pop strong, .loss-pop small { display: block; }.loss-pop strong { color: #fff1a8; font-size: clamp(24px, 4vw, 42px); }.loss-pop small { margin-top: 3px; font-size: 10px; letter-spacing: .1em; }
 .life-save { color: #ffdf71; font-size: clamp(28px, 5vw, 58px); animation: payout-pop 1s both; }
 .seven-event { animation: table-shake .45s linear; }.seven-event::before { content: ""; position: fixed; z-index: 20; inset: 0; pointer-events: none; background: #a20d1645; animation: red-flash .9s both; }
 
@@ -56,13 +64,15 @@ h2 { margin: 0; font: 400 clamp(34px, 4vw, 44px)/1 Georgia, serif; }.friendly-co
 .card-hand { display: grid; grid-template-columns: auto 1fr 1fr; gap: 7px; align-items: stretch; margin-bottom: 10px; }.card-hand > .section-label { align-self: center; margin: 0 7px 0 0; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 7px; }.round-card { position: relative; display: grid; grid-template-columns: 45px 1fr; gap: 10px; align-items: center; min-height: 70px; padding: 9px; overflow: hidden; color: #17211e; background: #ebe4d2; border: 2px solid #d7cba9; border-radius: 5px; box-shadow: 0 5px 15px #0005; }.round-card::after { content: ""; position: absolute; inset: auto -18px -28px auto; width: 70px; height: 70px; background: var(--suit-color); border-radius: 50%; opacity: .16; }.round-card > b { display: grid; place-items: center; width: 42px; height: 52px; color: white; background: var(--suit-color); border-radius: 3px; font: 700 16px Georgia, serif; }.round-card strong, .round-card small { display: block; }.round-card strong { font: 700 16px Georgia, serif; }.round-card small { margin-top: 4px; color: #52605a; font-size: 7px; line-height: 1.35; }.suit-violet { --suit-color: #69458b; }.suit-purple { --suit-color: #514d82; }.suit-green { --suit-color: #286b4d; }.suit-blue { --suit-color: #2e6393; }.suit-teal { --suit-color: #24746f; }.suit-red { --suit-color: #9b3036; }.suit-gold { --suit-color: #9e7629; }
 .power-button { flex: 1; min-width: 0; padding: 7px 4px; color: #cbd3d0; background: #16221e; border: 1px solid #394a43; cursor: pointer; }.power-button b, .power-button span, .power-button small { display: block; }.power-button b { color: #e2be57; font-size: 18px; }.power-button span { margin-top: 3px; font-size: 8px; }.power-button small { margin-top: 3px; color: #708079; font-size: 6px; }.power-button.active { background: #624e18; border-color: #f0cf67; box-shadow: inset 0 0 20px #f0cf6722; }.power-button:disabled { cursor: default; opacity: .65; }
 
-.number-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; }
+.number-grid { display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 108px; gap: 7px; }
 .bet-spot { position: relative; min-height: 80px; padding: 9px 4px; overflow: hidden; color: #fff9ea; border: 1px solid #ffffff24; cursor: pointer; transition: transform .15s, filter .15s, box-shadow .15s; }
 .bet-spot:hover:not(:disabled) { z-index: 1; transform: translateY(-2px); filter: brightness(1.18); }.bet-spot:disabled { cursor: wait; }.bet-spot .number { display: block; font: 400 29px/1 Georgia, serif; }.bet-spot .odds { display: block; margin-top: 7px; color: #ffffffb0; font-size: 7px; letter-spacing: .04em; }.bet-spot .help { display: block; margin-top: 4px; color: #ffffff82; font-size: 6px; }
 .bet-spot .placed { position: absolute; right: 5px; top: 5px; min-width: 29px; padding: 5px 3px; color: #15130c; background: #f0cf70; border: 2px dashed #55430f; border-radius: 50%; font-size: 8px; text-align: center; box-shadow: 0 2px 4px #0007; }.bet-spot .boost { position: absolute; left: 4px; top: 4px; padding: 2px 4px; color: #171309; background: #f3d36f; font-size: 6px; font-weight: 800; }.point-boost { display: inline-block; margin-top: 5px; padding: 2px 5px; color: #17140b; background: #f4d56f; font-size: 6px; font-weight: 900; letter-spacing: .06em; }
 .bet-spot.has-bet { border-color: #ffe084; box-shadow: inset 0 0 0 1px #ffe084, 0 0 14px #e4c45a24; }.bet-spot.winner { z-index: 2; animation: winner-glow 1s ease-in-out infinite alternate; }
 .n-2, .n-12 { background: #69458b; }.n-3, .n-11 { background: #514d82; }.n-4, .n-10 { background: #2e6393; }.n-5, .n-9 { background: #24746f; }.n-6, .n-8 { background: #286b4d; }.n-7 { background: #962d32; }
-.bet-spot.seven-bet { grid-column: 5 / 7; }.bet-spot.seven-bet .number { font-size: 35px; }
+.number-grid > .bet-spot { width: 100%; height: 100%; min-height: 0; }
+.bet-spot.all-bet { color: #19150b; background: linear-gradient(145deg, #eed776, #b58b2d); border-color: #fff0a7; }.bet-spot.all-bet .number { font-size: 23px; font-weight: 800; }.bet-spot.all-bet .odds { color: #211b0c; }.bet-spot.all-bet .odds strong { font: 800 13px/1.1 "Cascadia Mono", Consolas, monospace; }.bet-spot.all-bet .help { color: #3e310f; font-weight: 800; }
+.bet-spot.seven-bet { grid-column: auto; align-self: stretch; }.bet-spot.seven-bet .number { font-size: 29px; }.bet-spot.seven-bet .odds strong { font-size: 14px; }.bet-spot.seven-bet .help { margin-top: 2px; font-weight: 900; }
 .section-label { display: block; margin-top: 20px; }.hardway-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }.bet-spot.hard { min-height: 65px; }.bet-spot.hard.n-4, .bet-spot.hard.n-10 { color: #142b40; background: #a8c9e2; }.bet-spot.hard.n-6, .bet-spot.hard.n-8 { color: #153326; background: #9ed3b7; }.bet-spot.hard .number { color: inherit; font-size: 24px; }.bet-spot.hard .odds { color: currentColor; opacity: .72; }
 .bet-spot.power-affected { z-index: 2; border-color: #fff4a7; animation: power-glow .8s ease-in-out infinite alternate; }
 .bet-spot.card-affected:not(.power-affected) { z-index: 1; border-color: #9ce9dc; animation: card-glow 1s ease-in-out infinite alternate; }
@@ -95,6 +105,8 @@ h2 { margin: 0; font: 400 clamp(34px, 4vw, 44px)/1 Georgia, serif; }.friendly-co
 .eyebrow, .section-label { font-size: 12px; letter-spacing: .16em; }
 .status-strip small, .phase-track small, .spin-button small, .blocked-explainer span { font-size: 10px; }
 .text-button, .plain-steps span, .empty-powers, .rules, .history { font-size: 11px; }
+.return-chips { padding: 10px 13px; color: #f2d478; border: 1px solid #8d7a45; background: #101a16; font-size: 14px; font-weight: 800; letter-spacing: .04em; }
+.return-chips:hover:not(:disabled) { color: #17130b; background: #e2c35f; }
 .plain-steps b { font-size: 13px; }
 .power-dock { flex-wrap: wrap; }
 .power-dock > .section-label, .card-hand > .section-label { font-size: 9px; }
@@ -105,6 +117,7 @@ h2 { margin: 0; font: 400 clamp(34px, 4vw, 44px)/1 Georgia, serif; }.friendly-co
 .power-button small { color: #8a9b93; font-size: 9px; }
 .bet-spot { min-height: 86px; }
 .bet-spot .odds { color: #ffffffe0; font-size: 10px; }
+.bet-spot .odds small, .bet-spot .odds strong { display: block; }.bet-spot .odds small { font-size: 8px; letter-spacing: .14em; }.bet-spot .odds strong { margin-top: 1px; font: 800 17px/1 Georgia, serif; }
 .bet-spot .help, .bet-spot .boost, .point-boost { font-size: 9px; }
 .bet-spot .boost, .point-boost { padding: 3px 5px; }
 .bet-spot .placed { min-width: 31px; font-size: 10px; }
@@ -116,9 +129,20 @@ h2 { margin: 0; font: 400 clamp(34px, 4vw, 44px)/1 Georgia, serif; }.friendly-co
 .power-card small, .power-card button, .stat-grid span { font-size: 10px; }
 .victory-card > p:not(.eyebrow) { font-size: 12px; }
 
+.tutorial-overlay { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: 20px; background: radial-gradient(circle at 50% 25%, #214c3def, #050706fc 72%); animation: bailout-in .45s both; }
+.tutorial-card { position: relative; width: min(690px, 100%); min-height: 530px; padding: clamp(32px, 6vw, 64px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: linear-gradient(145deg, #15392d, #0b1512); border: 1px solid #c5a852; box-shadow: 0 32px 120px #000; }
+.tutorial-skip { position: absolute; right: 18px; top: 16px; padding: 7px 9px; color: #aebbb6; background: transparent; border: 0; border-bottom: 1px solid #75827d; cursor: pointer; font-size: 11px; }
+.tutorial-mark { display: grid; place-items: center; width: 100px; height: 100px; margin: 5px 0 20px; color: #16130b; background: #e2c35d; border: 6px double #665018; border-radius: 50%; font: 800 25px Georgia, serif; box-shadow: 0 0 40px #e2c35d44; }
+.tutorial-card h2 { max-width: 580px; }
+.tutorial-copy { max-width: 580px; margin: 18px auto 20px; color: #bac7c2; font: 13px/1.75 "Cascadia Mono", Consolas, monospace; }
+.tutorial-point { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 2px 0 16px; padding: 10px 18px; background: #0a110f; border: 1px solid #685e3e; }.tutorial-point span { color: #c7b379; font-size: 11px; letter-spacing: .16em; }.tutorial-point strong { display: grid; place-items: center; width: 48px; height: 48px; color: white; background: #286b4d; border-radius: 50%; font: 700 26px Georgia, serif; }.tutorial-point b { color: #f0d16f; font-size: 22px; }
+.tutorial-goal { width: min(500px, 100%); margin: 0 0 16px; padding: 13px; background: #09110e; border: 1px solid #6f6038; }.tutorial-goal small, .tutorial-goal strong, .tutorial-goal span { display: block; }.tutorial-goal small { color: #c1a95f; font-size: 10px; letter-spacing: .16em; }.tutorial-goal strong { margin: 5px 0; color: #f1d16f; font: 700 26px Georgia, serif; }.tutorial-goal span { color: #91a19a; font-size: 10px; line-height: 1.5; }
+.tutorial-progress { display: flex; gap: 7px; margin: 2px 0 19px; }.tutorial-progress i { width: 28px; height: 4px; background: #36433e; }.tutorial-progress i.done { background: #427a63; }.tutorial-progress i.active { background: #e2c35d; box-shadow: 0 0 10px #e2c35d88; }
+.tutorial-next { margin-top: 0; }
+
 @media (max-width: 1020px) {
     .game-grid { grid-template-columns: 1fr; }.wheel-panel { position: static; }.betting-panel { width: min(720px, 100%); margin: auto; }.shop-panel { max-height: none; }.wheel-wrap { width: min(570px, 100%); }
 }
 @media (max-width: 680px) {
-    .game-shell { padding: 18px 11px 40px; }.game-header { display: block; }.status-strip { margin-top: 20px; overflow-x: auto; }.status-strip > div { flex: 1; min-width: 72px; padding: 8px; }.status-strip strong { font-size: 14px; }.phase-track > div { min-width: 0; flex: 1; }.phase-track i { width: 18px; margin-right: 6px; }.phase-track span { font-size: 12px; }.phase-track small { display: none; }.game-grid { padding-top: 15px; gap: 18px; }.betting-panel { padding: 18px 10px; }.number-grid { grid-template-columns: repeat(3, 1fr); }.bet-spot.seven-bet { grid-column: 2 / 4; }.hardway-grid { grid-template-columns: repeat(2, 1fr); }.chip-rack > span { display: none; }.chip-rack { justify-content: center; gap: 8px; }.chip { width: 47px; height: 47px; }.allowed-numbers { grid-template-columns: repeat(3, 1fr); }.upgrade-grid { grid-template-columns: repeat(2, 1fr); }.power-card { grid-template-columns: 38px 1fr; }.power-card button { grid-column: 1 / 3; width: 100%; }.power-dock { overflow-x: auto; }.power-button { min-width: 86px; }.card-hand { grid-template-columns: 1fr; }.card-hand > .section-label { writing-mode: initial; transform: none; }.stat-grid { grid-template-columns: repeat(2, 1fr); }.game-grid { grid-template-columns: minmax(0, 1fr); }
+    .game-shell { padding: 18px 11px 40px; }.game-header { display: block; }.status-strip { margin-top: 20px; overflow-x: auto; }.status-strip > div { flex: 1; min-width: 72px; padding: 8px; }.status-strip strong { font-size: 14px; }.phase-track > div { min-width: 0; flex: 1; }.phase-track i { width: 18px; margin-right: 6px; }.phase-track span { font-size: 12px; }.phase-track small { display: none; }.game-grid { padding-top: 15px; gap: 18px; }.betting-panel { padding: 18px 10px; }.number-grid { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 108px; }.bet-spot.seven-bet { grid-column: auto; }.hardway-grid { grid-template-columns: repeat(2, 1fr); }.chip-rack > span { display: none; }.chip-rack { justify-content: center; gap: 8px; }.chip { width: 47px; height: 47px; }.allowed-numbers { grid-template-columns: repeat(3, 1fr); }.upgrade-grid { grid-template-columns: repeat(2, 1fr); }.power-card { grid-template-columns: 38px 1fr; }.power-card button { grid-column: 1 / 3; width: 100%; }.power-dock { overflow-x: auto; }.power-button { min-width: 86px; }.card-hand { grid-template-columns: 1fr; }.card-hand > .section-label { writing-mode: initial; transform: none; }.stat-grid { grid-template-columns: repeat(2, 1fr); }.game-grid { grid-template-columns: minmax(0, 1fr); }.tutorial-card { min-height: 0; padding: 48px 20px 26px; }.tutorial-copy { font-size: 11px; }.tutorial-mark { width: 78px; height: 78px; margin-bottom: 14px; }.tutorial-skip { right: 10px; top: 8px; }
 }

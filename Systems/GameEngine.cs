@@ -16,7 +16,7 @@ public sealed class GameEngine
         new(PowerId.NothingEasy, "Nothing Easy", "Hardway wins pay double for the rest of this round.", 550m, 3, "H"),
         new(PowerId.PointPress, "Point Press", "Point-number wins pay another 50% for this round.", 650m, 3, "P"),
         new(PowerId.HotHand, "Hot Hand", "Your next winning number or hardway spin pays 75% more.", 750m, 3, "♨"),
-        new(PowerId.BankrollGuard, "Bankroll Guard", "A seven-out returns 25% of the chips that were on the table.", 900m, 3, "▣"),
+        new(PowerId.BankrollGuard, "Bankroll Guard", "A seven-out returns 25% of the losing chips from the table.", 900m, 3, "▣"),
         new(PowerId.PlayItSafe, "Play It Safe", "Blocks three of the six red 7 slots for your next three spins.", 1250m, 3, "◆"),
         new(PowerId.ExtraLife, "Extra Life", "The next 7 is ignored. Your bets survive and the round continues.", 2000m, 5, "♥")
     ];
@@ -28,7 +28,7 @@ public sealed class GameEngine
         new("Green Pair", "6·8", "green", "+5% payout on 6 and 8.", CardEffect.SixEight, .05m),
         new("Blue Line", "4·10", "blue", "+8% payout on 4 and 10.", CardEffect.FourTen, .08m),
         new("Teal Tide", "5·9", "teal", "+8% payout on 5 and 9.", CardEffect.FiveNine, .08m),
-        new("Safety Net", "20%", "red", "Keep 20% of your table balance on seven-out.", CardEffect.SafetyNet, .20m),
+        new("Safety Net", "20%", "red", "Keep 20% of your losing table chips on seven-out.", CardEffect.SafetyNet, .20m),
         new("Missing Red", "−7", "red", "One of the six 7 slots is blocked this round.", CardEffect.BlockSeven, 1m),
         new("Hard Earned", "H", "gold", "+15% on hardway wins.", CardEffect.Hardways, .15m),
         new("Point Player", "●", "gold", "+10% on point-number wins.", CardEffect.PointBoost, .10m),
@@ -65,6 +65,26 @@ public sealed class GameEngine
         return true;
     }
 
+    public bool PlaceBetAcrossNumbers()
+    {
+        var chip = State.Player.SelectedChip;
+        if (!BettingIsOpen || State.Player.Bankroll < chip)
+            return false;
+
+        var share = chip / BetNumbers.Count;
+        State.Player.Bankroll -= chip;
+        State.AllNumbersBetTotal += chip;
+        State.Stats.TotalWagered += chip;
+        foreach (var number in BetNumbers)
+        {
+            var target = (BetTarget)number;
+            State.Bets[target] = State.Bets.GetValueOrDefault(target) + share;
+            State.Stats.WageredByTarget[target] = State.Stats.WageredByTarget.GetValueOrDefault(target) + share;
+        }
+        State.Message = $"{Money(chip)} spread across every number — {Money(share)} on each of the ten spots.";
+        return true;
+    }
+
     public void ClearBets()
     {
         if (!BettingIsOpen)
@@ -72,6 +92,7 @@ public sealed class GameEngine
 
         State.Player.Bankroll += State.TotalOnTable;
         State.Bets.Clear();
+        State.AllNumbersBetTotal = 0;
         State.Message = "Your chips are back in the rack.";
     }
 
@@ -79,6 +100,7 @@ public sealed class GameEngine
     {
         var eligible = Enumerable.Range(0, Wheel.Count)
             .Where(index => State.Phase != GamePhase.ComeOut || PointNumbers.Contains(Wheel[index].Total))
+            .Where(index => State.Phase != GamePhase.BettingRound || State.LifetimeBettingSpins >= 4 || Wheel[index].Total != 7)
             .Where(index => !IsSlotBlocked(index))
             .ToArray();
         var index = eligible[RandomNumberGenerator.GetInt32(eligible.Length)];
@@ -186,8 +208,10 @@ public sealed class GameEngine
             return;
 
         State.SpinsThisRound++;
+        State.LifetimeBettingSpins++;
         var notes = new List<string>();
         var tableBeforeSpin = State.TotalOnTable;
+        var sevenWager = State.Bets.GetValueOrDefault(BetTarget.Seven);
         ResolveSevenBet(result, notes);
 
         if (result.Total == 7 && ConsumeExtraLife())
@@ -211,16 +235,23 @@ public sealed class GameEngine
         if (result.Total == 7)
         {
             State.LastWasSeven = true;
-            var protectedAmount = ApplySevenProtection(tableBeforeSpin);
+            var losingBets = Math.Max(0m, tableBeforeSpin - sevenWager);
+            var protectedAmount = ApplySevenProtection(losingBets);
+            State.LastLoss = decimal.Round(losingBets - protectedAmount, 2);
             EndRound();
-            var payoutText = State.LastPayout > 0 ? $" {Money(State.LastPayout)} returned or won." : string.Empty;
-            var protectionText = protectedAmount > 0 ? " Your protection card or power saved part of the table." : string.Empty;
-            State.Message = $"Seven out. The round is over.{payoutText}{protectionText}";
+            var protectionText = protectedAmount > 0 ? $" {Money(protectedAmount)} was protected and returned." : string.Empty;
+            var sevenWinText = sevenWager > 0 ? $" Your red 7 won {Money(sevenWager * 4m)} profit and returned its {Money(sevenWager)} chip." : string.Empty;
+            State.Message = $"Seven out — {Money(State.LastLoss)} lost from the table.{protectionText}{sevenWinText}";
         }
         else if (State.LastPayout > 0)
         {
             State.LastWinNumber = result.Total;
-            State.Message = $"{result.Total} hits! You won {Money(State.LastPayout)}. Your place bets stay up.";
+            var hardLossText = State.LastLoss > 0 ? $" The easy {result.Total} also knocked down {Money(State.LastLoss)} in hardway bets." : string.Empty;
+            State.Message = $"{result.Total} hits! You won {Money(State.LastPayout)}. Your number bets remain on the table.{hardLossText}";
+        }
+        else if (State.LastLoss > 0)
+        {
+            State.Message = $"Easy {result.Total}! {Money(State.LastLoss)} in hardway bets lost. Normal number bets remain on the table.";
         }
         else if (State.Player.Bankroll < 5m && State.TotalOnTable < 5m)
         {
@@ -229,7 +260,7 @@ public sealed class GameEngine
         }
         else
         {
-            State.Message = $"{result.Total} landed. No payout this spin—your place bets stay up.";
+            State.Message = $"{result.Total} landed. No payout this spin. Your number bets remain on the table.";
         }
 
         FinalizeSpinStats();
@@ -383,7 +414,13 @@ public sealed class GameEngine
                 Award(wager, odds, false);
                 notes.Add($"Hard {number} paid {Money(wager * odds)}.");
             }
-            else if (result.Total == 7 || result.Total == number)
+            else if (result.Total == number)
+            {
+                State.Bets.Remove(target);
+                State.LastLoss += wager;
+                notes.Add($"Easy {number} knocked down {Money(wager)} from Hard {number}.");
+            }
+            else if (result.Total == 7)
             {
                 State.Bets.Remove(target);
             }
@@ -498,6 +535,7 @@ public sealed class GameEngine
         State.Stats.RoundsCompleted++;
         State.Point = null;
         State.Bets.Clear();
+        State.AllNumbersBetTotal = 0;
         foreach (var definition in PowerDefinitions)
         {
             var power = State.Upgrades.Powers[definition.Id];
@@ -516,6 +554,7 @@ public sealed class GameEngine
     private void ResetResultEffects()
     {
         State.LastPayout = 0;
+        State.LastLoss = 0;
         State.LastWinNumber = 0;
         State.LastWasSeven = false;
         State.ExtraLifeSaved = false;
