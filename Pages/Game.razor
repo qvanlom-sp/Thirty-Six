@@ -6,7 +6,7 @@
 
 <PageTitle>Thirty-Six — Dice Wheel</PageTitle>
 
-<div class="game-shell @(Engine.State.LastWasSeven ? "seven-event" : "") @(Engine.State.LastPayout > 0 ? "win-event" : "")">
+<div class="game-shell @(_reducedMotion ? "reduced-motion" : "") @(Engine.State.LastWasSeven ? "seven-event" : "") @(Engine.State.LastPayout > 0 ? "win-event" : "")">
     <header class="game-header">
         <div>
             <p class="eyebrow">THE DICE WHEEL</p>
@@ -21,11 +21,17 @@
             <div class="point-box @(Engine.State.Point is null ? "off" : "on")"><small>POINT</small><strong>@(Engine.State.Point?.ToString() ?? "—")</strong></div>
         </div>
     </header>
+    <div class="table-toolbar" aria-label="Game settings">
+        <span>PLAY CHIPS ONLY · NO REAL MONEY</span>
+        <label><input type="checkbox" @bind="_sound" /> Sound</label>
+        <label><input type="checkbox" @bind="_fastSpin" /> Quick spins</label>
+        <label><input type="checkbox" @bind="_reducedMotion" /> Less motion</label>
+    </div>
 
     <nav class="phase-track" aria-label="Round progress">
         <div class="@PhaseClass(GamePhase.ComeOut)"><b>1</b><span>Come-out<small>Set the point</small></span></div>
         <i></i>
-        <div class="@PhaseClass(GamePhase.BettingRound)"><b>2</b><span>Play<small>Bet until 7</small></span></div>
+        <div class="@PhaseClass(GamePhase.BettingRound)"><b>2</b><span>Play<small>Build or bank</small></span></div>
         <i></i>
         <div class="@PhaseClass(GamePhase.Shop)"><b>3</b><span>Shop<small>Grow stronger</small></span></div>
     </nav>
@@ -33,10 +39,11 @@
     <main class="game-grid">
         <section class="wheel-panel">
             <div class="wheel-wrap">
-                <canvas id="dice-wheel" aria-label="A roulette wheel with 36 equally likely dice combinations"></canvas>
+                <canvas id="dice-wheel" aria-label="A wheel of 36 dice combinations; blocked slots cannot land"></canvas>
+                <canvas id="win-effects" aria-hidden="true"></canvas>
                 @if (Engine.State.LastPayout > 0 && !Engine.State.LastWasSeven)
                 {
-                    <div class="payout-pop @(Engine.State.LastLoss > 0 ? "with-loss" : "")">+@Money(Engine.State.LastPayout)</div>
+                    <div @key="Engine.State.Stats.Spins" class="payout-pop @(Engine.State.LastLoss > 0 ? "with-loss" : "")"><small>@WinTitle</small>+@Money(Engine.State.LastPayout)</div>
                 }
                 @if (Engine.State.LastWasSeven && !Engine.State.ExtraLifeSaved)
                 {
@@ -48,7 +55,7 @@
                 }
                 @if (Engine.State.LastLoss > 0 && !Engine.State.LastWasSeven)
                 {
-                    <div class="loss-pop"><strong>-@Money(Engine.State.LastLoss)</strong><small>HARDWAY LOST · EASY @Engine.State.LastResult?.Total</small></div>
+                    <div class="loss-pop"><strong>-@Money(Engine.State.LastLoss)</strong><small>ONE-SPIN / HARDWAY LOSS</small></div>
                 }
             </div>
             <div class="result-banner" aria-live="polite">@Engine.State.Message</div>
@@ -56,6 +63,11 @@
                 <span>@SpinLabel</span>
                 <small>@SpinSubLabel</small>
             </button>
+            @if (Engine.State.Phase == GamePhase.BettingRound)
+            {
+                <button class="cashout-button" @onclick="CashOutAsync" disabled="@(!Engine.CanCashOut)">@(Engine.CanCashOut ? $"BANK {Money(Engine.State.TotalOnTable)} & VISIT SHOP" : $"CASH OUT AFTER {3 - Engine.State.SpinsThisRound} MORE SPINS")</button>
+            }
+            <div class="recent-rolls" aria-label="Recent results, newest first"><span>LAST ROLLS</span>@foreach (var roll in Engine.State.RecentRolls) { <b class="n-@roll">@roll</b> }</div>
         </section>
 
         @if (Engine.State.Phase == GamePhase.ComeOut)
@@ -96,6 +108,31 @@
                     }
                 </div>
 
+                <div class="streak-meter">
+                    <div><span>HOT STREAK</span><strong>@Engine.State.WinStreak wins · next win +@(Math.Min(4, Engine.State.WinStreak) * 5)%</strong></div>
+                    <div class="streak-pips" aria-hidden="true">@for (var i = 0; i < 5; i++) { <i class="@(i < Engine.State.WinStreak ? "lit" : "")"></i> }</div>
+                    <small>Consecutive winning spins build up to +20%. A miss resets the streak.</small>
+                </div>
+                <details class="round-challenges" open>
+                    <summary>ROUND CHALLENGES · @Engine.State.Challenges.Count(c => c.IsComplete) / 3 · NEW HAND EACH ROUND</summary>
+                    <div class="challenge-grid">
+                        @foreach (var challenge in Engine.State.Challenges)
+                        {
+                            <div class="challenge @(challenge.IsComplete ? "complete" : "")">
+                                <b>@challenge.Definition.Name</b>
+                                <small class="challenge-description">@challenge.Definition.Description</small>
+                                <span>@(challenge.IsComplete ? "✓ COMPLETE" : ChallengeProgress(challenge))</span>
+                                <progress value="@challenge.Progress" max="@challenge.Definition.Goal" aria-label="@challenge.Definition.Name"></progress>
+                                <small>+50% of hit · max @Money(challenge.Definition.RewardCap)</small>
+                            </div>
+                        }
+                    </div>
+                </details>
+                <div class="bet-tools">
+                    <button @onclick="RebetAsync" disabled="@(!Engine.CanRebet)">REPEAT LAST LAYOUT · @Money(Engine.RebetCost)</button>
+                    @if (Engine.State.LifetimeBettingSpins < 4) { <span>WELCOME SHIELD · @(4 - Engine.State.LifetimeBettingSpins) SAFE SPINS</span> }
+                </div>
+
                 <div class="power-dock">
                     <span class="section-label">POWER-UPS</span>
                     @foreach (var definition in GameEngine.PowerDefinitions)
@@ -103,8 +140,9 @@
                         var power = Engine.State.Upgrades.Powers[definition.Id];
                         @if (power.IsUnlocked)
                         {
-                            <button class="power-button @(power.IsActive ? "active" : "")" title="@definition.Description" @onclick="() => ActivatePowerAsync(definition.Id)" disabled="@(Engine.State.IsSpinning || power.IsActive || power.UsedThisRound || power.CooldownRemaining > 0)">
+                            <button class="power-button @(power.IsActive ? "active" : "")" title="@definition.Description" @onclick="() => ActivatePowerAsync(definition.Id)" disabled="@(Engine.State.IsSpinning || power.IsActive || power.CooldownRemaining > 0)">
                                 <b>@definition.Icon</b><span>@definition.Name</span><small>@PowerStatus(power)</small>
+                                @if (power.IsActive) { <small>Recharge: @power.CooldownRemaining spins</small> }
                             </button>
                         }
                     }
@@ -133,9 +171,9 @@
                         <span class="help">2–12 EXCEPT 7</span>
                         @if (Engine.State.AllNumbersBetTotal > 0) { <span class="placed">@Money(Engine.State.AllNumbersBetTotal)</span> }
                     </button>
-                    <button class="bet-spot n-7 seven-bet @PowerGlowClass(7) @CardGlowClass(7) @(Engine.State.Bets.ContainsKey(BetTarget.Seven) ? "has-bet" : "") @(Engine.State.LastWinNumber == 7 ? "winner" : "")" @onclick="() => PlaceBetAsync(BetTarget.Seven)" disabled="@Engine.State.IsSpinning">
+                    <button class="bet-spot n-7 seven-bet @PowerGlowClass(7) @CardGlowClass(7) @(Engine.State.Bets.ContainsKey(BetTarget.Seven) ? "has-bet" : "") @(Engine.State.LastWinNumber == 7 ? "winner" : "")" @onclick="() => PlaceBetAsync(BetTarget.Seven)" disabled="@(Engine.State.IsSpinning || Engine.State.LifetimeBettingSpins < 4)">
                         <span class="number">7</span><span class="odds seven-odds"><small>PAYS</small><strong>4:1</strong></span>
-                        <span class="help">ONE SPIN ONLY</span>
+                        <span class="help">@(Engine.State.LifetimeBettingSpins < 4 ? "WELCOME SHIELD ACTIVE" : "ONE SPIN ONLY")</span>
                         @if (Engine.SevenProtectionPercent() > 0) { <span class="boost">SAVE @Engine.SevenProtectionPercent()%</span> }
                         @if (Engine.State.Bets.TryGetValue(BetTarget.Seven, out var sevenAmount)) { <span class="placed">@Money(sevenAmount)</span> }
                     </button>
@@ -178,7 +216,7 @@
         {
             <section class="betting-panel shop-panel">
                 <div class="panel-heading"><div><p class="eyebrow">STEP 3 · BETWEEN ROUNDS</p><h2>The Back Room</h2></div><span class="shop-cash">@Money(Engine.State.Player.Bankroll)</span></div>
-                <p class="friendly-copy">Number upgrades permanently improve payouts. Power-ups are permanent unlocks: activate each once per eligible round, then wait out its round-based cooldown.</p>
+                <p class="friendly-copy">Power-ups are permanent unlocks. Cooldowns start on activation and count only betting spins with chips at risk, including protected spins. They carry across rounds; come-out spins and shop visits do not recharge them. Active effects end when their duration runs out, they are consumed, or the round ends.</p>
                 <button class="spin-button next-round" @onclick="LeaveShopAsync"><span>START NEXT ROUND</span><small>RETURN TO THE COME-OUT</small></button>
 
                 <p class="section-label">UPGRADE NUMBER PAYOUTS · +10% EACH LEVEL</p>
@@ -200,7 +238,7 @@
                         var power = Engine.State.Upgrades.Powers[definition.Id];
                         <article class="power-card @(definition.Id == PowerId.ExtraLife ? "legendary" : "")">
                             <div class="power-icon">@definition.Icon</div>
-                            <div><h3>@definition.Name</h3><p>@definition.Description</p><small>@definition.CooldownRounds-round cooldown</small></div>
+                            <div><h3>@definition.Name</h3><p>@definition.Description</p><small>@definition.DurationSpins-spin window · @definition.CooldownSpins-spin cooldown from activation</small></div>
                             <button @onclick="() => BuyPower(definition.Id)" disabled="@(power.IsUnlocked || Engine.State.Player.Bankroll < definition.UnlockCost)">@(power.IsUnlocked ? "UNLOCKED" : Money(definition.UnlockCost))</button>
                         </article>
                     }
@@ -266,7 +304,10 @@
             <h2>Congratulations!</h2>
             <p>You turned a $500 rack into @Money(Engine.State.Player.Bankroll). The table is yours.</p>
             <div class="stat-grid">
-                <div><strong>@Engine.State.Stats.RoundsCompleted</strong><span>Rounds survived</span></div>
+                <div><strong>@Engine.State.Stats.RoundsCompleted</strong><span>Rounds completed</span></div>
+                <div><strong>@Engine.State.Stats.BestStreak</strong><span>Best win streak</span></div>
+                <div><strong>@Engine.State.Stats.ChallengesCompleted</strong><span>Challenges completed</span></div>
+                <div><strong>@Engine.State.Stats.CashOuts</strong><span>Cash outs</span></div>
                 <div><strong>@Engine.State.Stats.Spins</strong><span>Total spins</span></div>
                 <div><strong>@Engine.MostBetName()</strong><span>Most-bet number</span></div>
                 <div><strong>@Money(Engine.State.Stats.BiggestSingleSpinPayout)</strong><span>Biggest spin</span></div>
@@ -285,15 +326,22 @@
     private int _washProgress;
     private bool _showTutorial = true;
     private int _tutorialStep;
+    private bool _sound;
+    private bool _fastSpin;
+    private bool _reducedMotion;
+    private static string ChallengeProgress(RoundChallenge challenge) => challenge.Definition.Kind == ChallengeKind.PrizeTotal
+        ? $"{Money(challenge.Progress)} / {Money(challenge.Definition.Goal)}"
+        : $"{challenge.Progress:0} / {challenge.Definition.Goal}";
+    private string WinTitle => Engine.State.LastChallengeReward > 0 ? "CHALLENGE COMPLETE" : Engine.State.LastPayout >= 500 ? "MEGA WIN" : Engine.State.LastPayout >= 100 ? "BIG WIN" : Engine.State.WinStreak >= 2 ? $"{Engine.State.WinStreak} WIN STREAK" : "WINNER";
     private static readonly decimal[] Chips = [5m, 10m, 25m, 100m];
     private static readonly int[] PlaceNumbers = [4, 5, 6, 8, 9, 10];
     private static readonly int[] UpgradeNumbers = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
     private static readonly BetTarget[] NumberTargets = [BetTarget.Number2, BetTarget.Number3, BetTarget.Number4, BetTarget.Number5, BetTarget.Number6, BetTarget.Number8, BetTarget.Number9, BetTarget.Number10, BetTarget.Number11, BetTarget.Number12];
     private static readonly BetTarget[] HardTargets = [BetTarget.Hard4, BetTarget.Hard6, BetTarget.Hard8, BetTarget.Hard10];
 
-    private bool CanSpin => !_showTutorial && !Engine.State.IsSpinning && Engine.State.Phase is GamePhase.ComeOut or GamePhase.BettingRound;
+    private bool CanSpin => !_showTutorial && !Engine.State.ShowVictory && !Engine.State.IsSpinning && (Engine.State.Phase == GamePhase.ComeOut || (Engine.State.Phase == GamePhase.BettingRound && Engine.State.TotalOnTable > 0));
     private int GoalProgress => Math.Min(100, (int)(Engine.State.Player.Bankroll / 200m));
-    private string SpinLabel => Engine.State.IsSpinning ? "THE BALL IS SPINNING…" : Engine.State.Phase switch { GamePhase.ComeOut => "SET THE POINT", GamePhase.BettingRound => "SPIN THE WHEEL", _ => "SHOP OPEN" };
+    private string SpinLabel => Engine.State.IsSpinning ? "THE BALL IS SPINNING…" : Engine.State.Phase switch { GamePhase.ComeOut => "SET THE POINT", GamePhase.BettingRound => Engine.State.TotalOnTable > 0 ? "SPIN THE WHEEL" : "PLACE CHIPS TO SPIN", _ => "SHOP OPEN" };
     private string SpinSubLabel => Engine.State.Phase switch { GamePhase.ComeOut => "SAFE SPIN · NO BETS", GamePhase.BettingRound => $"POINT {Engine.State.Point} · RED 7 ENDS THE ROUND", _ => "BUY UPGRADES TO CONTINUE" };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -301,6 +349,8 @@
         if (!firstRender) return;
         _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/diceWheel.js");
         await _module.InvokeVoidAsync("initialize", "dice-wheel", WheelView());
+        _reducedMotion = await _module.InvokeAsync<bool>("prefersReducedMotion");
+        StateHasChanged();
     }
 
     private async Task SpinAsync()
@@ -311,10 +361,21 @@
         Engine.State.Message = Engine.State.Phase == GamePhase.ComeOut ? "Choosing the point…" : "The ball is circling the wheel…";
         StateHasChanged();
         var outcome = Engine.PickOutcome();
-        await _module.InvokeVoidAsync("spinTo", outcome.Index, 2600);
+        await _module.InvokeVoidAsync("spinTo", outcome.Index, _reducedMotion ? 100 : _fastSpin ? 950 : 2200);
         Engine.Resolve(outcome.Slot);
         Engine.State.IsSpinning = false;
         await _module.InvokeVoidAsync("updateState", WheelView());
+        await _module.InvokeVoidAsync("celebrate", Engine.State.LastPayout, Engine.State.LastChallengeReward > 0, Engine.State.ExtraLifeSaved, _sound, _reducedMotion, Engine.State.LastWasSeven);
+    }
+
+    private async Task CashOutAsync()
+    {
+        if (Engine.CashOut() && _module is not null) await _module.InvokeVoidAsync("updateState", WheelView());
+    }
+
+    private async Task RebetAsync()
+    {
+        if (Engine.Rebet() && _module is not null) await _module.InvokeVoidAsync("updateState", WheelView());
     }
 
     private async Task PlaceBetAsync(BetTarget target)
@@ -373,7 +434,7 @@
         return current == phase ? "active" : (int)current > (int)phase ? "done" : string.Empty;
     }
 
-    private static string PowerStatus(PowerState power) => power.IsActive ? (power.SpinsRemaining > 0 ? $"{power.SpinsRemaining} spins" : "ACTIVE") : power.CooldownRemaining > 0 ? $"Ready in {power.CooldownRemaining} rounds" : power.UsedThisRound ? "USED" : "READY";
+    private static string PowerStatus(PowerState power) => power.IsActive ? $"ACTIVE · {power.SpinsRemaining} spins" : power.CooldownRemaining > 0 ? $"Ready in {power.CooldownRemaining} spins" : "READY";
     private string WashActionLabel => _washProgress switch { < 50 => "SCRUB THE DISH", < 80 => "RINSE THE DISH", _ => "STACK THE DISH" };
     private string DishIcon => _washProgress switch { < 40 => "✦", < 80 => "◌", _ => "✓" };
     private string PowerGlowClass(int number, bool isHard = false)
@@ -408,10 +469,10 @@
     };
     private string TutorialCopy => _tutorialStep switch
     {
-        0 => "Every possible two-dice result lives on this wheel—thirty-six slots, no hidden number weights. You arrive with a $500 stake and an invitation the pit boss expects you to waste.",
+        0 => "Every possible two-dice result lives on this wheel—thirty-six slots. You arrive with $500 in play chips. Your first four betting spins block red 7s; cards and powers can also block slots. Highlighted blocks always show what cannot land.",
         1 => "Each round opens with one safe spin and no betting. Its result becomes the point. Every winning bet on that number—including its hardway—pays a 1.5× bonus for the entire round.",
         2 => "Choose a chip, then choose numbers—or use All Numbers to spread 10% across each of the ten non-7 spots. Normal number bets remain until you return them or seven-out. A red 7 bet lasts one spin. Hardways need matching dice; the easy version knocks that hardway down.",
-        _ => "Seven-out sends you to the Back Room, where winnings become permanent payout upgrades and reusable powers. Cards reshape each round. Grow $500 into $20,000 and the House finally learns your name."
+        _ => "Build winning streaks for up to +20% and draw three fresh challenges each round. Powers recharge through betting spins, even across rounds. After three betting spins, you can bank your table and visit the shop—or keep playing. Grow $500 into $20,000 with permanent upgrades and reusable powers."
     };
     private void OpenTutorial() { _tutorialStep = 0; _showTutorial = true; }
     private void CloseTutorial() => _showTutorial = false;
@@ -433,6 +494,10 @@
 
     public async ValueTask DisposeAsync()
     {
-        if (_module is not null) await _module.DisposeAsync();
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync("dispose");
+            await _module.DisposeAsync();
+        }
     }
 }

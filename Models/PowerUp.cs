@@ -17,14 +17,14 @@ public sealed record PowerDefinition(
     string Name,
     string Description,
     decimal UnlockCost,
-    int CooldownRounds,
+    int CooldownSpins,
+    int DurationSpins,
     string Icon);
 
 public sealed class PowerState
 {
     public bool IsUnlocked { get; set; }
     public bool IsActive { get; set; }
-    public bool UsedThisRound { get; set; }
     public int CooldownRemaining { get; set; }
     public int SpinsRemaining { get; set; }
 }

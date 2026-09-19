@@ -11,14 +11,30 @@ public sealed class GameEngine
 
     public static readonly IReadOnlyList<PowerDefinition> PowerDefinitions =
     [
-        new(PowerId.LuckyFives, "Lucky 5s", "All winning 5 bets pay double for the rest of this round.", 300m, 2, "★"),
-        new(PowerId.HiLo, "Hi / Lo", "For one round, winning 2 and 12 bets pay five times their normal prize.", 450m, 3, "↕"),
-        new(PowerId.NothingEasy, "Nothing Easy", "Hardway wins pay double for the rest of this round.", 550m, 3, "H"),
-        new(PowerId.PointPress, "Point Press", "Point-number wins pay another 50% for this round.", 650m, 3, "P"),
-        new(PowerId.HotHand, "Hot Hand", "Your next winning number or hardway spin pays 75% more.", 750m, 3, "♨"),
-        new(PowerId.BankrollGuard, "Bankroll Guard", "A seven-out returns 25% of the losing chips from the table.", 900m, 3, "▣"),
-        new(PowerId.PlayItSafe, "Play It Safe", "Blocks three of the six red 7 slots for your next three spins.", 1250m, 3, "◆"),
-        new(PowerId.ExtraLife, "Extra Life", "The next 7 is ignored. Your bets survive and the round continues.", 2000m, 5, "♥")
+        new(PowerId.LuckyFives, "Lucky 5s", "Winning 5 bets pay double for the next 3 betting spins.", 300m, 9, 3, "★"),
+        new(PowerId.HiLo, "Hi / Lo", "Winning 2 and 12 bets pay five times their normal prize for 4 betting spins.", 450m, 14, 4, "↕"),
+        new(PowerId.NothingEasy, "Nothing Easy", "Hardway wins pay double for the next 3 betting spins.", 550m, 10, 3, "H"),
+        new(PowerId.PointPress, "Point Press", "Point-number wins pay another 50% for the next 3 betting spins.", 650m, 9, 3, "P"),
+        new(PowerId.HotHand, "Hot Hand", "Your next winning number or hardway spin within 3 betting spins pays 75% more.", 750m, 10, 3, "♨"),
+        new(PowerId.BankrollGuard, "Bankroll Guard", "For 4 betting spins, a seven-out returns 25% of losing table chips.", 900m, 10, 4, "▣"),
+        new(PowerId.PlayItSafe, "Play It Safe", "Blocks three of the six red 7 slots for your next 3 betting spins.", 1250m, 12, 3, "◆"),
+        new(PowerId.ExtraLife, "Extra Life", "Ignores the next 7 within 6 betting spins. Your number and hardway bets survive.", 2000m, 20, 6, "♥")
+    ];
+
+    public static readonly IReadOnlyList<ChallengeDefinition> ChallengeDeck =
+    [
+        new(ChallengeKind.Wins, "Three's a charm", "Win on three number or hardway spins.", 3, 50m, true),
+        new(ChallengeKind.Low, "Low roller", "Win twice on totals 2 through 6.", 2, 50m, true),
+        new(ChallengeKind.High, "High society", "Win twice on totals 8 through 12.", 2, 50m, true),
+        new(ChallengeKind.Even, "Even better", "Win on three even totals.", 3, 50m, true),
+        new(ChallengeKind.Odd, "Odd couple", "Win twice on odd totals (excluding 7).", 2, 60m, true),
+        new(ChallengeKind.Point, "On point", "Win on the point twice.", 2, 75m),
+        new(ChallengeKind.Hardway, "The hard way", "Win a hardway wager with matching dice.", 1, 100m),
+        new(ChallengeKind.Outer, "Edge of glory", "Win a wager on 2, 3, 11, or 12.", 1, 75m),
+        new(ChallengeKind.Variety, "Mix it up", "Win on three different totals.", 3, 60m),
+        new(ChallengeKind.Streak, "Heating up", "Win on three consecutive spins. A miss resets progress.", 3, 60m),
+        new(ChallengeKind.PrizeTotal, "Chip collector", "Earn $50 in number/hardway prizes before streak and challenge bonuses.", 50, 75m),
+        new(ChallengeKind.Powered, "Power play", "Win twice with a payout-boosting power affecting your winning wager.", 2, 75m)
     ];
 
     public static readonly IReadOnlyList<RoundCard> CardDeck =
@@ -50,11 +66,42 @@ public sealed class GameEngine
     public GameState State { get; }
     public IReadOnlyList<WheelSlot> Wheel { get; }
     public bool BettingIsOpen => State.Phase == GamePhase.BettingRound && !State.IsSpinning;
+    public bool CanCashOut => BettingIsOpen && State.SpinsThisRound >= 3;
+    public decimal RebetCost => State.PreviousBets.Values.Sum();
+    public bool CanRebet => BettingIsOpen && State.Bets.Count == 0 && RebetCost > 0 && State.Player.Bankroll >= RebetCost;
+
+    public bool Rebet()
+    {
+        if (!CanRebet) return false;
+        foreach (var (target, amount) in State.PreviousBets)
+        {
+            State.Bets[target] = amount;
+            State.Stats.WageredByTarget[target] = State.Stats.WageredByTarget.GetValueOrDefault(target) + amount;
+        }
+        State.Player.Bankroll -= RebetCost;
+        State.Stats.TotalWagered += RebetCost;
+        State.Message = $"Previous layout restored for {Money(RebetCost)}.";
+        return true;
+    }
+
+    public bool CashOut()
+    {
+        if (!CanCashOut) return false;
+        var returned = State.TotalOnTable;
+        State.Player.Bankroll += returned;
+        State.Stats.CashOuts++;
+        EndRound();
+        ResetResultEffects();
+        State.Message = $"Cashed out {Money(returned)}. Your chips are safe. Visit the Back Room.";
+        AddHistory(State.Message);
+        CheckVictory();
+        return true;
+    }
 
     public bool PlaceBet(BetTarget target)
     {
         var chip = State.Player.SelectedChip;
-        if (!BettingIsOpen || State.Player.Bankroll < chip)
+        if (!BettingIsOpen || chip <= 0 || !Enum.IsDefined(target) || State.Player.Bankroll < chip)
             return false;
 
         State.Player.Bankroll -= chip;
@@ -68,7 +115,7 @@ public sealed class GameEngine
     public bool PlaceBetAcrossNumbers()
     {
         var chip = State.Player.SelectedChip;
-        if (!BettingIsOpen || State.Player.Bankroll < chip)
+        if (!BettingIsOpen || chip <= 0 || State.Player.Bankroll < chip)
             return false;
 
         var share = chip / BetNumbers.Count;
@@ -94,6 +141,7 @@ public sealed class GameEngine
         State.Bets.Clear();
         State.AllNumbersBetTotal = 0;
         State.Message = "Your chips are back in the rack.";
+        CheckVictory();
     }
 
     public (int Index, WheelSlot Slot) PickOutcome()
@@ -107,7 +155,15 @@ public sealed class GameEngine
         return (index, Wheel[index]);
     }
 
-    public void PrepareSpin() => ResetResultEffects();
+    public void PrepareSpin()
+    {
+        ResetResultEffects();
+        if (BettingIsOpen && State.Bets.Count > 0)
+        {
+            State.PreviousBets.Clear();
+            foreach (var bet in State.Bets) State.PreviousBets.Add(bet.Key, bet.Value);
+        }
+    }
 
     public bool IsSlotBlocked(int index)
     {
@@ -116,6 +172,9 @@ public sealed class GameEngine
 
         if (Wheel[index].Total != 7)
             return false;
+
+        if (State.LifetimeBettingSpins < 4)
+            return true;
 
         var safe = State.Upgrades.Powers[PowerId.PlayItSafe];
         var blockedSevens = State.ActiveCards.Any(card => card.Effect == CardEffect.BlockSeven) ? 1 : 0;
@@ -188,6 +247,8 @@ public sealed class GameEngine
 
     public void Resolve(WheelSlot result)
     {
+        if (State.Phase is not (GamePhase.ComeOut or GamePhase.BettingRound)) return;
+        if (State.Phase == GamePhase.BettingRound && State.TotalOnTable <= 0) return;
         ResetResultEffects();
         State.LastResult = result;
         State.Stats.Spins++;
@@ -198,6 +259,7 @@ public sealed class GameEngine
             State.Phase = GamePhase.BettingRound;
             State.SpinsThisRound = 0;
             DealCards();
+            DealChallenges();
             State.Message = $"The point is {result.Total}. You drew {State.ActiveCards[0].Name} and {State.ActiveCards[1].Name}.";
             AddHistory(State.Message);
             CheckVictory();
@@ -209,6 +271,8 @@ public sealed class GameEngine
 
         State.SpinsThisRound++;
         State.LifetimeBettingSpins++;
+        State.RecentRolls.Insert(0, result.Total);
+        if (State.RecentRolls.Count > 12) State.RecentRolls.RemoveAt(12);
         var notes = new List<string>();
         var tableBeforeSpin = State.TotalOnTable;
         var sevenWager = State.Bets.GetValueOrDefault(BetTarget.Seven);
@@ -228,9 +292,9 @@ public sealed class GameEngine
         var payoutBeforeNumberWinnings = State.LastPayout;
         ResolvePlaceBets(result, notes);
         ResolveHardways(result, notes);
+        ApplyRoundProgress(result, State.LastPayout - payoutBeforeNumberWinnings);
         if (State.Upgrades.Powers[PowerId.HotHand].IsActive && State.LastPayout > payoutBeforeNumberWinnings)
             State.Upgrades.Powers[PowerId.HotHand].IsActive = false;
-        TickSpinPowers();
 
         if (result.Total == 7)
         {
@@ -246,23 +310,27 @@ public sealed class GameEngine
         else if (State.LastPayout > 0)
         {
             State.LastWinNumber = result.Total;
-            var hardLossText = State.LastLoss > 0 ? $" The easy {result.Total} also knocked down {Money(State.LastLoss)} in hardway bets." : string.Empty;
+            var hardLossText = State.LastLoss > 0 ? $" One-spin or hardway bets lost {Money(State.LastLoss)}." : string.Empty;
             State.Message = $"{result.Total} hits! You won {Money(State.LastPayout)}. Your number bets remain on the table.{hardLossText}";
         }
         else if (State.LastLoss > 0)
         {
-            State.Message = $"Easy {result.Total}! {Money(State.LastLoss)} in hardway bets lost. Normal number bets remain on the table.";
-        }
-        else if (State.Player.Bankroll < 5m && State.TotalOnTable < 5m)
-        {
-            EndRound();
-            State.Message = "Your rack is empty. The kitchen has a quick job for you.";
+            State.Message = $"{result.Total} landed. {Money(State.LastLoss)} in one-spin or hardway bets lost. Other number bets remain.";
         }
         else
         {
             State.Message = $"{result.Total} landed. No payout this spin. Your number bets remain on the table.";
         }
 
+        TickSpinPowers();
+        if (State.Phase == GamePhase.BettingRound && State.Player.Bankroll + State.TotalOnTable < 5m)
+        {
+            State.Player.Bankroll += State.TotalOnTable;
+            EndRound();
+            State.Message += " The kitchen has a fresh stake for you.";
+        }
+        if (State.LastStreakBonus > 0) State.Message += $" Streak bonus: {Money(State.LastStreakBonus)}.";
+        if (State.LastChallengeReward > 0) State.Message += $" Challenge complete: +{Money(State.LastChallengeReward)}!";
         FinalizeSpinStats();
         AddHistory(State.Message);
     }
@@ -302,13 +370,13 @@ public sealed class GameEngine
     public bool ActivatePower(PowerId id)
     {
         var power = State.Upgrades.Powers[id];
-        if (!BettingIsOpen || !power.IsUnlocked || power.IsActive || power.UsedThisRound || power.CooldownRemaining > 0)
+        if (!BettingIsOpen || !power.IsUnlocked || power.IsActive || power.CooldownRemaining > 0)
             return false;
 
         power.IsActive = true;
-        power.UsedThisRound = true;
-        if (id == PowerId.PlayItSafe)
-            power.SpinsRemaining = 3;
+        var definition = PowerDefinitions.Single(item => item.Id == id);
+        power.CooldownRemaining = definition.CooldownSpins;
+        power.SpinsRemaining = definition.DurationSpins;
         State.Message = $"{PowerDefinitions.Single(item => item.Id == id).Name} activated.";
         return true;
     }
@@ -323,6 +391,8 @@ public sealed class GameEngine
         State.Point = null;
         State.LastResult = null;
         State.ActiveCards.Clear();
+        State.WinStreak = 0;
+        State.Challenges.Clear();
         ResetResultEffects();
         State.Message = "Come-out spin: the highlighted point numbers are the only possible results.";
     }
@@ -374,6 +444,56 @@ public sealed class GameEngine
             Award(sevenWager, 4m, true);
             notes.Add($"Red 7 won {Money(sevenWager * 4m)}.");
         }
+        else State.LastLoss += sevenWager;
+    }
+
+    // Bonuses are proportional to actual prizes: tiny wagers cannot farm fixed rewards.
+    private void ApplyRoundProgress(WheelSlot result, decimal numberPrize)
+    {
+        if (numberPrize <= 0)
+        {
+            State.WinStreak = 0;
+            foreach (var challenge in State.Challenges.Where(c => !c.IsComplete && c.Definition.Kind == ChallengeKind.Streak))
+                challenge.Progress = 0;
+            return;
+        }
+        State.WinStreak++;
+        State.Stats.BestStreak = Math.Max(State.Stats.BestStreak, State.WinStreak);
+        State.LastStreakBonus = decimal.Round(numberPrize * Math.Min(4, State.WinStreak - 1) * .05m, 2);
+        var hardwayWon = result.IsHard && State.Bets.ContainsKey((BetTarget)(result.Total + 100));
+        var poweredWin = (State.Bets.ContainsKey((BetTarget)result.Total) && PowerPayoutMultiplier(result.Total, false) > 1)
+            || (hardwayWon && PowerPayoutMultiplier(result.Total, true) > 1);
+        foreach (var challenge in State.Challenges.Where(c => !c.IsComplete))
+        {
+            challenge.WinningNumbers.Add(result.Total);
+            challenge.Progress = challenge.Definition.Kind switch
+            {
+                ChallengeKind.Variety => challenge.WinningNumbers.Count,
+                ChallengeKind.Streak => State.WinStreak,
+                ChallengeKind.PrizeTotal => challenge.Progress + numberPrize,
+                _ => challenge.Progress + (challenge.Definition.Kind switch
+                {
+                    ChallengeKind.Wins => true,
+                    ChallengeKind.Point => result.Total == State.Point,
+                    ChallengeKind.Hardway => hardwayWon,
+                    ChallengeKind.Low => result.Total <= 6,
+                    ChallengeKind.High => result.Total >= 8,
+                    ChallengeKind.Even => result.Total % 2 == 0,
+                    ChallengeKind.Odd => result.Total % 2 != 0,
+                    ChallengeKind.Outer => result.Total is 2 or 3 or 11 or 12,
+                    ChallengeKind.Powered => poweredWin,
+                    _ => false
+                } ? 1 : 0)
+            };
+            if (challenge.Progress < challenge.Definition.Goal) continue;
+            challenge.Progress = challenge.Definition.Goal;
+            challenge.IsComplete = true;
+            State.Stats.ChallengesCompleted++;
+            State.LastChallengeReward += decimal.Round(Math.Min(challenge.Definition.RewardCap, numberPrize * .5m), 2);
+        }
+        var bonus = State.LastStreakBonus + State.LastChallengeReward;
+        State.Player.Bankroll += bonus;
+        State.LastPayout += bonus;
     }
 
     private void ResolvePlaceBets(WheelSlot result, List<string> notes)
@@ -488,6 +608,20 @@ public sealed class GameEngine
         }
     }
 
+    private void DealChallenges()
+    {
+        State.Challenges.Clear();
+        var hasPayoutPower = State.Upgrades.Powers.Any(p => p.Value.IsUnlocked &&
+            p.Key is PowerId.LuckyFives or PowerId.HiLo or PowerId.NothingEasy or PowerId.PointPress or PowerId.HotHand);
+        var common = ChallengeDeck.Where(c => c.Common).ToList();
+        var specialist = ChallengeDeck.Where(c => !c.Common && (c.Kind != ChallengeKind.Powered || hasPayoutPower)).ToList();
+        Shuffle(common);
+        Shuffle(specialist);
+        // Every hand has an accessible objective and two different specialist objectives.
+        State.Challenges.Add(new(common[0]));
+        State.Challenges.AddRange(specialist.Take(2).Select(c => new RoundChallenge(c)));
+    }
+
     private decimal ApplySevenProtection(decimal tableBalance)
     {
         var rate = State.ActiveCards.Where(card => card.Effect == CardEffect.SafetyNet).Sum(card => card.Value);
@@ -495,7 +629,6 @@ public sealed class GameEngine
             rate += .25m;
         var saved = decimal.Round(tableBalance * rate, 2);
         State.Player.Bankroll += saved;
-        State.LastPayout += saved;
         return saved;
     }
 
@@ -525,9 +658,13 @@ public sealed class GameEngine
 
     private void TickSpinPowers()
     {
-        var safe = State.Upgrades.Powers[PowerId.PlayItSafe];
-        if (safe.IsActive && --safe.SpinsRemaining <= 0)
-            safe.IsActive = false;
+        // Only resolved, wagered betting spins count. Come-out and shop visits never recharge powers.
+        foreach (var power in State.Upgrades.Powers.Values)
+        {
+            if (power.CooldownRemaining > 0) power.CooldownRemaining--;
+            if (power.IsActive && --power.SpinsRemaining <= 0) power.IsActive = false;
+            if (!power.IsActive) power.SpinsRemaining = 0;
+        }
     }
 
     private void EndRound()
@@ -539,12 +676,7 @@ public sealed class GameEngine
         foreach (var definition in PowerDefinitions)
         {
             var power = State.Upgrades.Powers[definition.Id];
-            if (power.CooldownRemaining > 0)
-                power.CooldownRemaining--;
-            if (power.UsedThisRound)
-                power.CooldownRemaining = definition.CooldownRounds;
             power.IsActive = false;
-            power.UsedThisRound = false;
             power.SpinsRemaining = 0;
         }
 
@@ -554,6 +686,7 @@ public sealed class GameEngine
     private void ResetResultEffects()
     {
         State.LastPayout = 0;
+        State.LastStreakBonus = State.LastChallengeReward = 0;
         State.LastLoss = 0;
         State.LastWinNumber = 0;
         State.LastWasSeven = false;

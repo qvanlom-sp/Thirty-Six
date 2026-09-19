@@ -23,6 +23,12 @@ public sealed class GameState
     public bool ExtraLifeSaved { get; set; }
     public bool GoalReached { get; set; }
     public bool ShowVictory { get; set; }
+    public int WinStreak { get; set; }
+    public decimal LastStreakBonus { get; set; }
+    public decimal LastChallengeReward { get; set; }
+    public List<RoundChallenge> Challenges { get; } = [];
+    public Dictionary<BetTarget, decimal> PreviousBets { get; } = [];
+    public List<int> RecentRolls { get; } = [];
     public string Message { get; set; } = "Spin once to choose the round’s point. Betting opens after that.";
     public decimal TotalOnTable => Bets.Values.Sum();
 }

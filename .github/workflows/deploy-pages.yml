@@ -25,6 +25,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - name: Verify game rules
+        run: dotnet run --project Tests/EngineChecks.csproj -c Release
+      - name: Verify audio routing
+        run: node Tests/audio-checks.mjs
       - run: dotnet publish -c Release -o publish
       - name: Configure repository base path and SPA fallback
         shell: bash

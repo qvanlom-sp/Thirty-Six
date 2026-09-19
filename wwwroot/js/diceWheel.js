@@ -3,6 +3,11 @@ let ctx;
 let state = { slots: [] };
 let rotation = 0;
 let ball = null;
+let resizeObserver;
+let effectFrame;
+let spinFrame;
+let finishSpin;
+let audio;
 
 const colors = {
     2: "#69458b", 3: "#514d82", 4: "#2e6393", 5: "#24746f", 6: "#286b4d",
@@ -16,7 +21,8 @@ export function initialize(canvasId, nextState) {
     ctx = canvas.getContext("2d");
     state = nextState;
     resize();
-    new ResizeObserver(resize).observe(canvas);
+    resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(canvas.parentElement);
 }
 
 function resize() {
@@ -36,7 +42,11 @@ export function updateState(nextState) {
 }
 
 export function spinTo(targetIndex, duration) {
+    cancelAnimationFrame(effectFrame);
+    const effects = document.getElementById("win-effects");
+    if (effects) effects.getContext("2d").clearRect(0, 0, effects.width, effects.height);
     return new Promise(resolve => {
+        finishSpin = resolve;
         const arc = Math.PI * 2 / state.slots.length;
         const desired = -Math.PI / 2 - (targetIndex + 0.5) * arc;
         const start = rotation;
@@ -53,16 +63,108 @@ export function spinTo(targetIndex, duration) {
             ball.angle = -Math.PI / 2 - Math.PI * 2 * 7 * eased;
             ball.distance = 1 - .1 * eased;
             draw();
-            if (t < 1) requestAnimationFrame(frame);
+            if (t < 1) spinFrame = requestAnimationFrame(frame);
             else {
                 rotation %= Math.PI * 2;
                 ball = { angle: -Math.PI / 2, distance: .9 };
                 draw();
                 resolve();
+                finishSpin = null;
             }
         }
-        requestAnimationFrame(frame);
+        spinFrame = requestAnimationFrame(frame);
     });
+}
+
+export function prefersReducedMotion() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+export function celebrate(prize, challenge, saved, sound, reducedMotion, sevenOut = false) {
+    // Seven-out takes precedence over a red-7 payout; a saved seven keeps its uplifting chime.
+    if (sevenOut && !saved) {
+        if (sound) playChime(1, false, true);
+        return;
+    }
+    const tier = challenge || prize >= 500 ? 3 : prize >= 100 ? 2 : 1;
+    if (prize <= 0 && !saved) return;
+    if (sound) playChime(tier, saved);
+    if (reducedMotion) return;
+    const layer = document.getElementById("win-effects");
+    if (!layer || !canvas) return;
+    cancelAnimationFrame(effectFrame);
+    const size = canvas.clientWidth;
+    const dpr = window.devicePixelRatio || 1;
+    layer.width = size * dpr;
+    layer.height = size * dpr;
+    const fx = layer.getContext("2d");
+    fx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const palette = saved ? ["#8fffd2", "#fff", "#5db7ff"] : ["#ffe596", "#e6b844", "#fff5d8", "#79eac5"];
+    const particles = Array.from({ length: tier * 34 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = size * (.18 + Math.random() * .48);
+        return { vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - size * .22,
+            color: palette[Math.floor(Math.random() * palette.length)], size: 3 + Math.random() * 5, angle };
+    });
+    const start = performance.now();
+    function frame(now) {
+        const t = (now - start) / 1000;
+        fx.clearRect(0, 0, size, size);
+        fx.globalAlpha = Math.max(0, 1 - t / 1.8);
+        fx.strokeStyle = saved ? "#8fffd2" : "#ffe596";
+        fx.lineWidth = 3;
+        fx.beginPath();
+        fx.arc(size / 2, size / 2, Math.min(size * .47, t * size * .5), 0, Math.PI * 2);
+        fx.stroke();
+        for (const p of particles) {
+            fx.save();
+            fx.translate(size / 2 + p.vx * t, size / 2 + p.vy * t + size * .3 * t * t);
+            fx.rotate(p.angle + t * 5);
+            fx.fillStyle = p.color;
+            fx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * .6);
+            fx.restore();
+        }
+        if (t < 1.8) effectFrame = requestAnimationFrame(frame);
+        else fx.clearRect(0, 0, size, size);
+    }
+    effectFrame = requestAnimationFrame(frame);
+}
+
+function playChime(tier, saved, sevenOut = false) {
+    try {
+        audio ??= new AudioContext();
+        audio.resume().then(() => {
+            if (!audio || audio.state !== "running") return;
+            const notes = sevenOut ? [220, 164.81, 110, 55] : saved ? [440, 660, 880] : [523.25, 659.25, 783.99, 1046.5].slice(0, tier + 1);
+            notes.forEach((frequency, index) => {
+                const oscillator = audio.createOscillator();
+                const gain = audio.createGain();
+                const time = audio.currentTime + index * (sevenOut ? .13 : .09);
+                const duration = sevenOut ? .55 : .4;
+                oscillator.type = sevenOut ? "triangle" : "sine";
+                oscillator.frequency.value = frequency;
+                if (sevenOut) oscillator.frequency.exponentialRampToValueAtTime(frequency * .72, time + duration);
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(sevenOut ? .055 : .065, time + .015);
+                gain.gain.exponentialRampToValueAtTime(.001, time + duration);
+                oscillator.connect(gain).connect(audio.destination);
+                oscillator.start(time);
+                oscillator.stop(time + duration + .02);
+            });
+        }).catch(() => {});
+    } catch { /* Audio is optional when the browser disallows it. */ }
+}
+
+export function dispose() {
+    resizeObserver?.disconnect();
+    cancelAnimationFrame(effectFrame);
+    cancelAnimationFrame(spinFrame);
+    finishSpin?.();
+    finishSpin = null;
+    audio?.close().catch(() => {});
+    audio = null;
+    ctx = null;
+    canvas = null;
 }
 
 function draw() {

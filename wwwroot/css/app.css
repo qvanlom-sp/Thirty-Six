@@ -146,3 +146,42 @@ h2 { margin: 0; font: 400 clamp(34px, 4vw, 44px)/1 Georgia, serif; }.friendly-co
 @media (max-width: 680px) {
     .game-shell { padding: 18px 11px 40px; }.game-header { display: block; }.status-strip { margin-top: 20px; overflow-x: auto; }.status-strip > div { flex: 1; min-width: 72px; padding: 8px; }.status-strip strong { font-size: 14px; }.phase-track > div { min-width: 0; flex: 1; }.phase-track i { width: 18px; margin-right: 6px; }.phase-track span { font-size: 12px; }.phase-track small { display: none; }.game-grid { padding-top: 15px; gap: 18px; }.betting-panel { padding: 18px 10px; }.number-grid { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 108px; }.bet-spot.seven-bet { grid-column: auto; }.hardway-grid { grid-template-columns: repeat(2, 1fr); }.chip-rack > span { display: none; }.chip-rack { justify-content: center; gap: 8px; }.chip { width: 47px; height: 47px; }.allowed-numbers { grid-template-columns: repeat(3, 1fr); }.upgrade-grid { grid-template-columns: repeat(2, 1fr); }.power-card { grid-template-columns: 38px 1fr; }.power-card button { grid-column: 1 / 3; width: 100%; }.power-dock { overflow-x: auto; }.power-button { min-width: 86px; }.card-hand { grid-template-columns: 1fr; }.card-hand > .section-label { writing-mode: initial; transform: none; }.stat-grid { grid-template-columns: repeat(2, 1fr); }.game-grid { grid-template-columns: minmax(0, 1fr); }.tutorial-card { min-height: 0; padding: 48px 20px 26px; }.tutorial-copy { font-size: 11px; }.tutorial-mark { width: 78px; height: 78px; margin-bottom: 14px; }.tutorial-skip { right: 10px; top: 8px; }
 }
+
+/* Progress and celebrations stay local to the table. */
+.table-toolbar { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 16px; padding: 12px 0; color: #b6c5bd; font-size: 11px; }
+.table-toolbar > span { margin-right: auto; color: #829a8d; font-size: 9px; letter-spacing: .1em; }
+.table-toolbar label { display: flex; gap: 5px; align-items: center; cursor: pointer; }
+.table-toolbar input { accent-color: #edce75; }
+#win-effects { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
+.payout-pop small { display: block; text-align: center; font-size: 12px; letter-spacing: .18em; color: #fff5d4; }
+.cashout-button, .bet-tools button { padding: 10px 14px; color: #cde6d9; background: #142d23; border: 1px solid #52745e; cursor: pointer; font-size: 10px; }
+.cashout-button { margin-top: 12px; width: min(390px, 88%); }
+.cashout-button:hover:not(:disabled), .bet-tools button:hover:not(:disabled) { background: #28513c; }
+.cashout-button:disabled, .bet-tools button:disabled { opacity: .45; cursor: default; }
+.recent-rolls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 5px; margin: 18px 0 0; }
+.recent-rolls > span { font-size: 9px; color: #94a69c; margin-right: 4px; }
+.recent-rolls b { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; font-size: 10px; }
+.streak-meter { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 13px; margin: 14px 0 10px; border: 1px solid #927744; background: linear-gradient(110deg, #392c15, #17271e); }
+.streak-meter span { display: block; color: #d0b674; font-size: 9px; letter-spacing: .18em; }
+.streak-meter strong { display: block; color: #ffe1a0; margin-top: 4px; font-size: 12px; }
+.streak-meter small { flex-basis: 100%; color: #b7b9a8; font-size: 10px; }
+.streak-pips { display: flex; align-items: center; gap: 5px; }
+.streak-pips i { width: 13px; height: 25px; transform: skew(-12deg); background: #4b4731; }
+.streak-pips i.lit { background: #f5c963; box-shadow: 0 0 12px #e9b04466; }
+.round-challenges summary { color: #cabd97; font-size: 10px; cursor: pointer; padding: 7px 0; }
+.challenge-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.challenge { padding: 10px 8px; border: 1px solid #415349; background: #101e18; }
+.challenge b, .challenge span, .challenge small { display: block; }
+.challenge b { font-size: 10px; color: #d8e4db; }
+.challenge span { margin: 6px 0; color: #e5ca82; font-size: 12px; }
+.challenge small { font-size: 9px; color: #a3b4a9; line-height: 1.5; }
+.challenge.complete { border-color: #6bbc96; background: #193e2c; }
+.challenge.complete span { color: #97efba; }
+.challenge .challenge-description { margin-top: 7px; color: #ccd8cf; }
+.challenge progress { display: block; width: 100%; height: 5px; margin: 8px 0; accent-color: #e5ca82; }
+.bet-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+.bet-tools span { color: #a9e6d0; font-size: 9px; }
+.reduced-motion *, .reduced-motion *::before, .reduced-motion *::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (max-width: 680px) { .table-toolbar { gap: 10px; justify-content: flex-start; } .table-toolbar > span { width: 100%; } .challenge-grid { gap: 4px; } }
+.payout-pop { padding: 13px 20px; border-radius: 16px; background: #0b201bee; border: 1px solid #e6c46788; box-shadow: 0 0 35px #e6c46733; }
