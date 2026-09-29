@@ -11,29 +11,29 @@ public sealed class GameEngine
 
     public static readonly IReadOnlyList<PowerDefinition> PowerDefinitions =
     [
-        new(PowerId.LuckyFives, "Lucky 5s", "Winning 5 bets pay double for the next 3 betting spins.", 300m, 9, 3, "★"),
-        new(PowerId.HiLo, "Hi / Lo", "Winning 2 and 12 bets pay five times their normal prize for 4 betting spins.", 450m, 14, 4, "↕"),
-        new(PowerId.NothingEasy, "Nothing Easy", "Hardway wins pay double for the next 3 betting spins.", 550m, 10, 3, "H"),
-        new(PowerId.PointPress, "Point Press", "Point-number wins pay another 50% for the next 3 betting spins.", 650m, 9, 3, "P"),
-        new(PowerId.HotHand, "Hot Hand", "Your next winning number or hardway spin within 3 betting spins pays 75% more.", 750m, 10, 3, "♨"),
+        new(PowerId.LuckyFives, "Lucky 5s", "Winning 5 bets pay double for the next 5 betting spins.", 300m, 9, 5, "★"),
+        new(PowerId.HiLo, "Hi / Lo", "Winning 2 and 12 bets pay five times their normal prize for 6 betting spins.", 450m, 14, 6, "↕"),
+        new(PowerId.NothingEasy, "Nothing Easy", "Hardway wins pay double for the next 5 betting spins.", 550m, 10, 5, "H"),
+        new(PowerId.PointPress, "Point Press", "Point-number wins pay another 50% for the next 5 betting spins.", 650m, 9, 5, "P"),
+        new(PowerId.HotHand, "Hot Hand", "Your next winning number within 5 betting spins pays 75% more.", 750m, 10, 5, "♨"),
         new(PowerId.BankrollGuard, "Bankroll Guard", "For 4 betting spins, a seven-out returns 25% of losing table chips.", 900m, 10, 4, "▣"),
-        new(PowerId.PlayItSafe, "Play It Safe", "Blocks three of the six red 7 slots for your next 3 betting spins.", 1250m, 12, 3, "◆"),
-        new(PowerId.ExtraLife, "Extra Life", "Ignores the next 7 within 6 betting spins. Your number and hardway bets survive.", 2000m, 20, 6, "♥")
+        new(PowerId.PlayItSafe, "Play It Safe", "Blocks three of the six red 7 slots for your next 4 betting spins.", 1250m, 12, 4, "◆"),
+        new(PowerId.ExtraLife, "Extra Life", "Ignores the next 7 within 6 betting spins. Your number and hardway bets survive.", 2000m, 15, 6, "♥")
     ];
 
     public static readonly IReadOnlyList<ChallengeDefinition> ChallengeDeck =
     [
-        new(ChallengeKind.Wins, "Three's a charm", "Win on three number or hardway spins.", 3, 50m, true),
+        new(ChallengeKind.Wins, "Three's a charm", "Win on three different spins.", 3, 50m, true),
         new(ChallengeKind.Low, "Low roller", "Win twice on totals 2 through 6.", 2, 50m, true),
         new(ChallengeKind.High, "High society", "Win twice on totals 8 through 12.", 2, 50m, true),
         new(ChallengeKind.Even, "Even better", "Win on three even totals.", 3, 50m, true),
         new(ChallengeKind.Odd, "Odd couple", "Win twice on odd totals (excluding 7).", 2, 60m, true),
         new(ChallengeKind.Point, "On point", "Win on the point twice.", 2, 75m),
-        new(ChallengeKind.Hardway, "The hard way", "Win a hardway wager with matching dice.", 1, 100m),
+        new(ChallengeKind.Hardway, "The hard way", "Win a hardway wager.", 1, 100m),
         new(ChallengeKind.Outer, "Edge of glory", "Win a wager on 2, 3, 11, or 12.", 1, 75m),
-        new(ChallengeKind.Variety, "Mix it up", "Win on three different totals.", 3, 60m),
+        new(ChallengeKind.Variety, "Mix it up", "Win on three different numbers.", 3, 60m),
         new(ChallengeKind.Streak, "Heating up", "Win on three consecutive spins. A miss resets progress.", 3, 60m),
-        new(ChallengeKind.PrizeTotal, "Chip collector", "Earn $50 in number/hardway prizes before streak and challenge bonuses.", 50, 75m),
+        new(ChallengeKind.PrizeTotal, "Chip collector", "Earn $50 in number/hardway prizes before bonuses.", 50, 75m),
         new(ChallengeKind.Powered, "Power play", "Win twice with a payout-boosting power affecting your winning wager.", 2, 75m)
     ];
 
@@ -54,7 +54,7 @@ public sealed class GameEngine
         new("Small Stakes", "$10", "teal", "+8% on winning wagers of $10 or less.", CardEffect.SmallStakes, .08m),
         new("Big Stakes", "$25+", "blue", "+6% on winning wagers of $25 or more.", CardEffect.BigStakes, .06m),
         new("Table Favor", "+3%", "gold", "+3% on every number and hardway win.", CardEffect.AllNumbers, .03m),
-        new("Pocket Chip", "$10", "green", "Receive $10 immediately when dealt.", CardEffect.PocketChip, 10m)
+        new("Pocket Chip", "$10", "green", "Receive $50 immediately when dealt.", CardEffect.PocketChip, 50m)
     ];
 
     public GameEngine()

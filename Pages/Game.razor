@@ -9,7 +9,7 @@
 <div class="game-shell @(_reducedMotion ? "reduced-motion" : "") @(Engine.State.LastWasSeven ? "seven-event" : "") @(Engine.State.LastPayout > 0 ? "win-event" : "")">
     <header class="game-header">
         <div>
-            <p class="eyebrow">THE DICE WHEEL</p>
+            <p class="eyebrow">THE HOUSE OF</p>
             <h1>THIRTY<span>—SIX</span></h1>
             <button class="tutorial-reopen" @onclick="OpenTutorial">HOW TO PLAY</button>
         </div>
@@ -22,7 +22,7 @@
         </div>
     </header>
     <div class="table-toolbar" aria-label="Game settings">
-        <span>PLAY CHIPS ONLY · NO REAL MONEY</span>
+        <span>NO CRYING IN THE CASINO</span>
         <label><input type="checkbox" @bind="_sound" /> Sound</label>
         <label><input type="checkbox" @bind="_fastSpin" /> Quick spins</label>
         <label><input type="checkbox" @bind="_reducedMotion" /> Less motion</label>
@@ -85,8 +85,8 @@
                 <div class="blocked-explainer"><span>BLOCKED</span><b>2</b><b>3</b><b class="red">7</b><b>11</b><b>12</b></div>
                 <ol class="plain-steps">
                     <li><b>Spin to set the point.</b><span>No money is at risk.</span></li>
-                    <li><b>Draw two bonus cards.</b><span>Then place chips—every number bet stays in play.</span></li>
-                    <li><b>A red 7 ends the round.</b><span>Then visit the shop and begin again.</span></li>
+                    <li><b>Then place chips.</b><span>Your money stays on the table and wins on every hit.</span></li>
+                    <li><b>A red 7 ends the round.</b><span>Visit the shop and begin again.</span></li>
                 </ol>
             </section>
         }
@@ -216,7 +216,7 @@
         {
             <section class="betting-panel shop-panel">
                 <div class="panel-heading"><div><p class="eyebrow">STEP 3 · BETWEEN ROUNDS</p><h2>The Back Room</h2></div><span class="shop-cash">@Money(Engine.State.Player.Bankroll)</span></div>
-                <p class="friendly-copy">Power-ups are permanent unlocks. Cooldowns start on activation and count only betting spins with chips at risk, including protected spins. They carry across rounds; come-out spins and shop visits do not recharge them. Active effects end when their duration runs out, they are consumed, or the round ends.</p>
+                <p class="friendly-copy">Power-ups are permanent unlocks. Cooldowns start on activation and count only betting spins. They carry across rounds; come-out spins and shop visits do not recharge them. Active effects end when their duration runs out or the round ends.</p>
                 <button class="spin-button next-round" @onclick="LeaveShopAsync"><span>START NEXT ROUND</span><small>RETURN TO THE COME-OUT</small></button>
 
                 <p class="section-label">UPGRADE NUMBER PAYOUTS · +10% EACH LEVEL</p>
@@ -326,7 +326,7 @@
     private int _washProgress;
     private bool _showTutorial = true;
     private int _tutorialStep;
-    private bool _sound;
+    private bool _sound = true;
     private bool _fastSpin;
     private bool _reducedMotion;
     private static string ChallengeProgress(RoundChallenge challenge) => challenge.Definition.Kind == ChallengeKind.PrizeTotal
@@ -469,10 +469,10 @@
     };
     private string TutorialCopy => _tutorialStep switch
     {
-        0 => "Every possible two-dice result lives on this wheel—thirty-six slots. You arrive with $500 in play chips. Your first four betting spins block red 7s; cards and powers can also block slots. Highlighted blocks always show what cannot land.",
-        1 => "Each round opens with one safe spin and no betting. Its result becomes the point. Every winning bet on that number—including its hardway—pays a 1.5× bonus for the entire round.",
-        2 => "Choose a chip, then choose numbers—or use All Numbers to spread 10% across each of the ten non-7 spots. Normal number bets remain until you return them or seven-out. A red 7 bet lasts one spin. Hardways need matching dice; the easy version knocks that hardway down.",
-        _ => "Build winning streaks for up to +20% and draw three fresh challenges each round. Powers recharge through betting spins, even across rounds. After three betting spins, you can bank your table and visit the shop—or keep playing. Grow $500 into $20,000 with permanent upgrades and reusable powers."
+        0 => "Every possible two-dice result lives on this wheel of thirty-six slots, equivalent to real dice odds. Betting on numbers causes a win on every hit, but a red 7 makes you lose all the money on the table. You arrive with $500. The pit boss offers you a one-time deal of four free spins with no red 7s, expecting to win it all back in the long run.",
+        1 => "Each round opens with one safe spin and no betting. Its result becomes the point. Every winning bet on that number pays a 1.5× bonus for the entire round.",
+        2 => "Choose a chip, then place your bets. Normal bets remain until you return them or seven-out. A red 7 bet lasts one spin. Hardways need matching dice (4+4 dice result = 8 Hard); the easy version knocks that hardway down (3+5 = 8 Easy).",
+        _ => "Build winning streaks, draw random bonus cards and challenges, and purchase permanent upgrades. Grow $500 into $20,000 to show that they made a mistake letting you in here."
     };
     private void OpenTutorial() { _tutorialStep = 0; _showTutorial = true; }
     private void CloseTutorial() => _showTutorial = false;
