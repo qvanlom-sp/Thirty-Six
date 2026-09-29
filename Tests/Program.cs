@@ -37,6 +37,16 @@ game.Resolve(new WheelSlot(3, 3));
 Check(game.State.LastLoss == 5 && game.State.Bets.Count == 0 && game.State.Player.Bankroll == 495, "red seven loss reported and debited exactly once");
 
 game = Table();
+game.State.Player.Bankroll = 818.93m;
+game.State.Player.SelectedChip = Player.AllChip;
+Check(game.PlaceBet(BetTarget.Number10), "ALL chip can be placed on a number");
+Check(game.State.Bets[BetTarget.Number10] == 818m && game.State.Player.Bankroll == .93m, "ALL chip stakes whole dollars and leaves cents in bankroll");
+Check(!game.PlaceBet(BetTarget.Number10), "ALL chip cannot place a zero-dollar wager");
+game.ClearBets();
+Check(game.State.Player.Bankroll == 818.93m, "return chips restores an ALL wager");
+Check(game.PlaceBetAcrossNumbers() && game.State.AllNumbersBetTotal == 818m && game.State.Player.Bankroll == .93m, "ALL chip uses whole bankroll on the spread spot");
+
+game = Table();
 game.PlaceBet(BetTarget.Number6);
 game.PrepareSpin();
 Check(!game.CashOut(), "cannot cash out before three spins");
@@ -72,8 +82,12 @@ game.State.Player.Bankroll = 5;
 game.PlaceBet(BetTarget.Seven);
 game.Resolve(new WheelSlot(1, 2));
 Check(game.State.Phase == GamePhase.Bailout, "last-chip red seven loss cannot softlock empty table");
+Check(game.State.Stats.DishesWashed == 0, "dish count starts at zero before bailout work");
 game.CompleteBailout();
 Check(game.State.Player.Bankroll == 200 && game.State.Phase == GamePhase.Shop, "bailout restores playable bankroll");
+Check(game.State.Stats.DishesWashed == 1, "completed dish increments the victory stat once");
+game.CompleteBailout();
+Check(game.State.Stats.DishesWashed == 1, "repeat bailout completion does not count another dish");
 
 game = Table();
 game.State.Player.Bankroll = 4;

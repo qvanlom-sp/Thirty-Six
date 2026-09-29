@@ -89,7 +89,6 @@ public sealed class GameEngine
         if (!CanCashOut) return false;
         var returned = State.TotalOnTable;
         State.Player.Bankroll += returned;
-        State.Stats.CashOuts++;
         EndRound();
         ResetResultEffects();
         State.Message = $"Cashed out {Money(returned)}. Your chips are safe. Visit the Back Room.";
@@ -100,7 +99,7 @@ public sealed class GameEngine
 
     public bool PlaceBet(BetTarget target)
     {
-        var chip = State.Player.SelectedChip;
+        var chip = State.Player.SelectedWager;
         if (!BettingIsOpen || chip <= 0 || !Enum.IsDefined(target) || State.Player.Bankroll < chip)
             return false;
 
@@ -114,7 +113,7 @@ public sealed class GameEngine
 
     public bool PlaceBetAcrossNumbers()
     {
-        var chip = State.Player.SelectedChip;
+        var chip = State.Player.SelectedWager;
         if (!BettingIsOpen || chip <= 0 || State.Player.Bankroll < chip)
             return false;
 
@@ -402,6 +401,7 @@ public sealed class GameEngine
         if (State.Phase != GamePhase.Bailout)
             return;
 
+        State.Stats.DishesWashed++;
         State.Player.Bankroll += 200m;
         State.Phase = GamePhase.Shop;
         State.Message = "Shift complete. You earned $200—spend carefully.";
