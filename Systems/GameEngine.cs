@@ -54,7 +54,7 @@ public sealed class GameEngine
         new("Small Stakes", "$10", "teal", "+8% on winning wagers of $10 or less.", CardEffect.SmallStakes, .08m),
         new("Big Stakes", "$25+", "blue", "+6% on winning wagers of $25 or more.", CardEffect.BigStakes, .06m),
         new("Table Favor", "+3%", "gold", "+3% on every number and hardway win.", CardEffect.AllNumbers, .03m),
-        new("Pocket Chip", "$10", "green", "Receive $50 immediately when dealt.", CardEffect.PocketChip, 50m)
+        new("Pocket Chip", "$50", "green", "Receive $50 immediately when dealt.", CardEffect.PocketChip, 50m)
     ];
 
     public GameEngine()
