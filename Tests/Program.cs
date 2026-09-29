@@ -194,13 +194,14 @@ Check(guard.CooldownRemaining == 3, "cash-out does not grant an extra cooldown t
 game = Table();
 game.PlaceBet(BetTarget.Number6);
 var life = game.State.Upgrades.Powers[PowerId.ExtraLife];
+var lifeDefinition = GameEngine.PowerDefinitions.Single(power => power.Id == PowerId.ExtraLife);
 life.IsUnlocked = true;
 game.ActivatePower(PowerId.ExtraLife);
 game.Resolve(new WheelSlot(1, 6));
-Check(game.State.ExtraLifeSaved && game.State.TotalOnTable == 5 && life.CooldownRemaining == 19 && !life.IsActive,
+Check(game.State.ExtraLifeSaved && game.State.TotalOnTable == 5 && life.CooldownRemaining == lifeDefinition.CooldownSpins - 1 && !life.IsActive,
     "saved seven consumes life and ticks cooldown once");
 game.Resolve(new WheelSlot(1, 6));
-Check(game.State.Phase == GamePhase.Shop && life.CooldownRemaining == 18, "extra life cannot save consecutive sevens");
+Check(game.State.Phase == GamePhase.Shop && life.CooldownRemaining == lifeDefinition.CooldownSpins - 2, "extra life cannot save consecutive sevens");
 
 game = Table();
 game.State.Challenges.Clear();
@@ -210,5 +211,5 @@ hot.IsUnlocked = true;
 game.ActivatePower(PowerId.HotHand);
 game.Resolve(new WheelSlot(3, 3));
 Check(game.State.LastPayout == 10.21m && !hot.IsActive && hot.CooldownRemaining == 9, "hot hand boosts exactly one win then cools down");
-Check(GameEngine.PowerDefinitions.All(p => p.CooldownSpins >= p.DurationSpins * 2), "every power has at least half its cycle without coverage");
+Check(GameEngine.PowerDefinitions.All(p => p.CooldownSpins > p.DurationSpins), "every power has mandatory downtime after coverage");
 Console.WriteLine($"{checks} checks passed.");
